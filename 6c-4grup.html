@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>KOD ADI: MEZUNİYET (FaceID Edition)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+        body {
+            margin: 0; overflow: hidden; background-color: #050505;
+            font-family: 'Share Tech Mono', monospace; color: #0f0;
+        }
+
+        /* KAMERA / FACE ID EKRANI */
+        #camera-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 200; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+        }
+        #webcam-container {
+            width: 640px; height: 480px; border: 4px solid #0f0; position: relative;
+            overflow: hidden; background: #111;
+            box-shadow: 0 0 30px #0f0;
+        }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); } /* Ayna modu */
+        
+        .scan-line {
+            position: absolute; top: 0; left: 0; width: 100%; height: 5px;
+            background: rgba(0, 255, 0, 0.8);
+            box-shadow: 0 0 15px #0f0;
+            animation: scanAnim 2s infinite linear;
+        }
+        .face-frame {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 200px; height: 250px; border: 2px dashed #0f0;
+        }
+        .status-text { margin-top: 20px; font-size: 24px; color: #0f0; text-transform: uppercase; letter-spacing: 2px; }
+
+        @keyframes scanAnim {
+            0% { top: 0%; } 100% { top: 100%; }
+        }
+
+        /* ANA MENÜ */
+        .screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 5, 5, 0.95);
+            display: none; /* Kamera bitince açılacak */
+            flex-direction: column; align-items: center; justify-content: center;
+            z-index: 100; pointer-events: all;
+        }
+        
+        button.start-btn {
+            margin-top: 30px; padding: 15px 60px; font-size: 24px;
+            background: transparent; color: #0f0; border: 2px solid #0f0;
+            cursor: pointer; font-family: 'Share Tech Mono'; transition: 0.3s;
+        }
+        button.start-btn:hover { background: #0f0; color: #000; box-shadow: 0 0 20px #0f0; }
+
+        /* HACK PANELİ */
+        #hack-terminal {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 400px; background: #000; border: 2px solid #0f0;
+            padding: 20px; display: none; pointer-events: all; text-align: center;
+            box-shadow: 0 0 20px #0f0; z-index: 50;
+        }
+        .code-display { font-size: 40px; margin: 20px 0; letter-spacing: 10px; background: #111; padding: 10px; border: 1px solid #333; }
+        .numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+        .num-btn { padding: 15px; background: #002200; border: 1px solid #0f0; color: #0f0; font-size: 20px; cursor: pointer; font-family: 'Share Tech Mono'; }
+        .num-btn:hover { background: #0f0; color: #000; }
+
+        /* UI */
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; padding: 20px; box-sizing: border-box;
+            display: none; flex-direction: column; justify-content: space-between;
+            text-shadow: 0 0 5px #0f0; z-index: 10;
+        }
+        .hud-panel { background: rgba(0, 20, 0, 0.7); border: 1px solid #0f0; padding: 15px; border-radius: 5px; }
+        
+        #start-warning {
+            position: absolute; top: 20%; left: 50%; transform: translateX(-50%);
+            font-size: 40px; color: red; background: rgba(0,0,0,0.8); padding: 10px;
+            display: none; z-index: 50; border: 2px solid red;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="camera-screen">
+        <h2 style="margin-bottom: 20px;">BİYOMETRİK DOĞRULAMA SİSTEMİ</h2>
+        <div id="webcam-container">
+            <video id="webcam" autoplay playsinline></video>
+            <div class="scan-line"></div>
+            <div class="face-frame"></div>
+        </div>
+        <div id="cam-status" class="status-text">YÜZ TARANIYOR...</div>
+    </div>
+
+    <div id="start-screen" class="screen">
+        <h1 style="font-size: 50px; color: #0f0;">KOD ADI: MEZUNİYET</h1>
+        <p style="color: #aaa;">KİMLİK DOĞRULANDI: ÖĞRENCİ</p>
+        <br>
+        <p>GÖREV: ZORLU YAZILILARDAN KAÇ VE ŞİFRELERİ TOPLA.</p>
+        <p>UYARI: ŞİFREYİ YANLIŞ GİRERSEN BÖLÜM BAŞTAN BAŞLAR!</p>
+        <button class="start-btn" onclick="initGame()">SINAVA GİRİŞ</button>
+    </div>
+
+    <div id="game-over" class="screen" style="display: none;">
+        <h1 style="color: red;">BAŞARISIZ OLUNDU</h1>
+        <p id="death-reason" style="font-size: 24px;">...</p>
+        <button class="start-btn" onclick="restartLevel()">BÖLÜMÜ TEKRARLA</button>
+    </div>
+
+    <div id="hack-terminal">
+        <h2 style="color: #0f0;">KAPI KİLİT SİSTEMİ</h2>
+        <p>TOPLANAN VERİLERİ GİRİN:</p>
+        <div class="code-display" id="code-input">----</div>
+        <div class="numpad">
+            <button class="num-btn" onclick="typeCode(1)">1</button>
+            <button class="num-btn" onclick="typeCode(2)">2</button>
+            <button class="num-btn" onclick="typeCode(3)">3</button>
+            <button class="num-btn" onclick="typeCode(4)">4</button>
+            <button class="num-btn" onclick="typeCode(5)">5</button>
+            <button class="num-btn" onclick="typeCode(6)">6</button>
+            <button class="num-btn" onclick="typeCode(7)">7</button>
+            <button class="num-btn" onclick="typeCode(8)">8</button>
+            <button class="num-btn" onclick="typeCode(9)">9</button>
+            <button class="num-btn" onclick="clearCode()">C</button>
+            <button class="num-btn" onclick="typeCode(0)">0</button>
+            <button class="num-btn" onclick="submitCode()">OK</button>
+        </div>
+    </div>
+
+    <div id="start-warning">⚠️ YAZILILAR GELİYOR... KOŞ! ⚠️</div>
+
+    <div id="ui-layer">
+        <div style="display: flex; justify-content: space-between;">
+            <div class="hud-panel">
+                <div>KAT: <span id="level-display">1</span> - <span id="level-name">KORİDOR</span></div>
+                <div>MESAFE: <span id="dist-display">0</span>m</div>
+            </div>
+            <div class="hud-panel" style="text-align: right;">
+                <div style="color: gold;">ŞİFRE: <span id="collected-pass">_ _ _ _</span></div>
+                <div style="font-size: 12px; color: #aaa;">(Yanlış girersen sıfırlanır)</div>
+            </div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+            <div class="hud-panel">
+                <div>ENERJİ: <span id="hp-display">100</span>%</div>
+                <div style="width: 200px; height: 10px; background: #333; margin-top:5px;">
+                    <div id="hp-bar" style="width: 100%; height: 100%; background: #0f0;"></div>
+                </div>
+            </div>
+            <div class="hud-panel" style="text-align: right;">
+                <div>TUZAK: <span id="trap-display">3</span> ADET</div>
+                <div style="font-size: 12px; color: #888;">[E] TUZAK | [SHIFT] KAY</div>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // --- KAMERA SİSTEMİ ---
+    window.onload = function() {
+        const video = document.getElementById('webcam');
+        const status = document.getElementById('cam-status');
+
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+                setTimeout(() => { status.innerText = "YÜZ ALGILANDI..."; status.style.color = "yellow"; }, 1500);
+                setTimeout(() => { status.innerText = "ANALİZ EDİLİYOR..."; }, 3000);
+                setTimeout(() => { 
+                    status.innerText = "DOĞRULANDI: İNSAN"; 
+                    status.style.color = "#0f0";
+                    video.pause();
+                    // Kamerayı kapatıp menüye geç
+                    setTimeout(() => {
+                        document.getElementById('camera-screen').style.display = 'none';
+                        document.getElementById('start-screen').style.display = 'flex';
+                        // Streami durdur (Kamera ışığı sönsün)
+                        stream.getTracks().forEach(track => track.stop());
+                    }, 1500);
+                }, 4500);
+            })
+            .catch(err => {
+                status.innerText = "KAMERA BULUNAMADI - MANUEL GİRİŞ";
+                setTimeout(() => {
+                    document.getElementById('camera-screen').style.display = 'none';
+                    document.getElementById('start-screen').style.display = 'flex';
+                }, 2000);
+            });
+    };
+
+    // --- OYUN DEĞİŞKENLERİ ---
+    let gameState = "MENU"; 
+    let level = 1; 
+    let frame = 0;
+
+    const player = {
+        x: 200, y: 0, w: 40, h: 80,
+        vx: 0, vy: 0, speed: 7, jump: -16,
+        grounded: false, sliding: false,
+        hp: 100, traps: 3,
+        collectedCode: []
+    };
+
+    let gravity = 0.6;
+    let cameraX = 0;
+    let groundY = canvas.height - 100;
+
+    let platforms = [], obstacles = [], passFragments = [], traps = [], enemies = [], particles = [];
+    let boss = { active: false, x: 0, y: 0, hp: 100 };
+    let bossProjectiles = [], playerProjectiles = [];
+
+    let currentLevelCode = [];
+    let inputCode = "";
+
+    const keys = {};
+    window.addEventListener('keydown', e => keys[e.code] = true);
+    window.addEventListener('keyup', e => keys[e.code] = false);
+
+    function initGame() {
+        document.getElementById('start-screen').style.display = 'none';
+        document.getElementById('ui-layer').style.display = 'flex';
+        loadLevel(1);
+    }
+
+    function restartLevel() {
+        document.getElementById('game-over').style.display = 'none';
+        loadLevel(level); // Aynı bölümü baştan yükle
+    }
+
+    function loadLevel(lvl) {
+        level = lvl;
+        gameState = "PLAY";
+        frame = 0;
+        cameraX = 0;
+        player.x = 200; player.y = 0; player.vx = 0; player.vy = 0;
+        player.collectedCode = [];
+        player.traps = 3;
+        player.hp = 100;
+        
+        platforms = []; obstacles = []; passFragments = []; enemies = []; bossProjectiles=[]; playerProjectiles=[];
+        boss.active = false;
+
+        // Uyarı Göster
+        if(level !== 3) {
+            let warn = document.getElementById('start-warning');
+            warn.style.display = 'block';
+            setTimeout(() => { warn.style.display = 'none'; }, 3000);
+        }
+
+        if(level === 1) {
+            document.getElementById('level-name').innerText = "KORİDORLAR";
+            generateLevelData(6000, 4);
+            enemies.push({x: -1200, y: groundY - 90, w: 60, h: 80, speed: 5.5, type: 'EXAM'});
+        } else if(level === 2) {
+            document.getElementById('level-name').innerText = "LABORATUVAR";
+            generateLevelData(7000, 5); 
+            enemies.push({x: -1200, y: groundY - 90, w: 60, h: 80, speed: 6.0, type: 'HARD_EXAM'});
+        } else if(level === 3) {
+            document.getElementById('level-name').innerText = "YKS ARENASI";
+            gameState = "BOSS";
+            boss.active = true;
+            boss.x = canvas.width - 300; boss.y = groundY - 250; boss.hp = 100;
+            platforms.push({x: -1000, y: groundY, w: 5000, h: 100});
+        }
+        loop();
+    }
+
+    function generateLevelData(length, codeLen) {
+        platforms.push({x: -500, y: groundY, w: length + 2000, h: 100});
+        currentLevelCode = [];
+        for(let i=0; i<codeLen; i++) currentLevelCode.push(Math.floor(Math.random()*10));
+        
+        let step = length / (codeLen + 1);
+        for(let i=0; i<codeLen; i++) {
+            let pos = (i+1) * step + (Math.random() * 200 - 100);
+            let platY = groundY - 150 - Math.random()*100;
+            platforms.push({x: pos - 100, y: platY, w: 200, h: 20});
+            passFragments.push({x: pos, y: platY - 50, val: currentLevelCode[i], collected: false});
+
+            if(Math.random() > 0.4) {
+                obstacles.push({x: pos + 300, y: groundY - 50, w: 50, h: 50, type: 'BOX'});
+            }
+        }
+        obstacles.push({x: length, y: groundY - 200, w: 100, h: 200, type: 'DOOR'});
+    }
+
+    function loop() {
+        if(gameState === "OVER" || gameState === "WIN" || gameState === "HACK" || gameState === "MENU") return;
+        requestAnimationFrame(loop);
+        frame++;
+        
+        ctx.fillStyle = "#050505";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        drawMatrixRain();
+
+        if(gameState === "PLAY") updatePlay();
+        else if(gameState === "BOSS") updateBoss();
+
+        drawGame();
+        drawUI();
+    }
+
+    function updatePlay() {
+        if(keys['KeyD']) player.vx = player.speed;
+        else if(keys['KeyA']) player.vx = -player.speed;
+        else player.vx = 0;
+
+        if((keys['Space'] || keys['KeyW']) && player.grounded) {
+            player.vy = player.jump; player.grounded = false;
+        }
+
+        if(keys['ShiftLeft']) {
+            if(!player.sliding) { player.h = 40; player.y += 40; player.sliding = true; }
+        } else {
+            if(player.sliding) { player.h = 80; player.y -= 40; player.sliding = false; }
+        }
+
+        if(keys['KeyE'] && player.traps > 0) {
+            keys['KeyE'] = false; player.traps--;
+            traps.push({x: player.x, y: groundY - 10, w: 30, h: 10});
+        }
+
+        player.vy += gravity; player.x += player.vx; player.y += player.vy;
+        player.grounded = false;
+
+        platforms.forEach(p => {
+            if(checkCol(player, p) && player.vy > 0 && player.y + player.h - player.vy <= p.y) {
+                player.grounded = true; player.vy = 0; player.y = p.y - player.h;
+            }
+        });
+
+        obstacles.forEach(o => {
+            if(o.type === 'DOOR') {
+                if(checkCol(player, o)) startHack();
+            } else {
+                if(checkCol(player, o)) player.x -= 10;
+            }
+        });
+
+        passFragments.forEach(pf => {
+            if(!pf.collected && checkCol(player, {x:pf.x, y:pf.y, w:30, h:30})) {
+                pf.collected = true; player.collectedCode.push(pf.val);
+                createParticles(pf.x, pf.y, '#0f0');
+            }
+        });
+
+        if(player.x > 400) cameraX = player.x - 400;
+
+        // --- DÜŞMAN: YAZILI KAĞIDI ---
+        enemies.forEach(e => {
+            if(frame < 180) return; // 3 sn bekle
+            if(e.stunned > 0) e.stunned--;
+            else {
+                if(e.x < player.x - 50) e.x += e.speed;
+                if(checkCol(player, e)) gameOver("ZORLU YAZILIYA YAKALANDIN!");
+            }
+            traps.forEach((t, ti) => {
+                if(checkCol(e, t)) { e.stunned = 180; traps.splice(ti, 1); }
+            });
+        });
+
+        if(player.y > canvas.height) gameOver("BOŞLUĞA DÜŞTÜN!");
+    }
+
+    function updateBoss() {
+        if(keys['KeyD']) player.x += player.speed;
+        if(keys['KeyA']) player.x -= player.speed;
+        if(keys['Space'] && player.grounded) { player.vy = player.jump; player.grounded = false; }
+        
+        player.vy += gravity; player.y += player.vy;
+        if(player.y + player.h > groundY) { player.y = groundY - player.h; player.vy = 0; player.grounded = true; }
+
+        if(frame % 100 === 0) {
+            bossProjectiles.push({
+                x: boss.x, y: boss.y + 100,
+                vx: -8 - Math.random()*5, vy: (player.y - boss.y)*0.01,
+                txt: ["SORU", "X", "Y"][Math.floor(Math.random()*3)]
+            });
+        }
+        bossProjectiles.forEach((p, i) => {
+            p.x += p.vx; p.y += p.vy;
+            if(checkCol(player, {x:p.x, y:p.y, w:50, h:20})) {
+                player.hp -= 20; bossProjectiles.splice(i, 1);
+                createParticles(player.x, player.y, 'red');
+                if(player.hp <= 0) gameOver("SINAVDA BAŞARISIZ OLDUN!");
+            }
+        });
+        playerProjectiles.forEach((p, i) => {
+            p.x += p.vx;
+            if(checkCol({x:p.x, y:p.y, w:20, h:10}, {x:boss.x, y:boss.y, w:200, h:200})) {
+                boss.hp -= 5; playerProjectiles.splice(i, 1);
+                createParticles(boss.x+100, boss.y+100, 'white');
+            }
+        });
+        if(boss.hp <= 0) { alert("TEBRİKLER! ÜNİVERSİTEYİ KAZANDIN!"); location.reload(); }
+        boss.y = groundY - 300 + Math.sin(frame*0.05)*50;
+    }
+
+    function startHack() {
+        gameState = "HACK";
+        document.getElementById('hack-terminal').style.display = 'block';
+        inputCode = ""; updateCodeDisplay();
+    }
+    function typeCode(n) { if(inputCode.length < currentLevelCode.length) { inputCode += n; updateCodeDisplay(); } }
+    function clearCode() { inputCode = ""; updateCodeDisplay(); }
+    function updateCodeDisplay() { document.getElementById('code-input').innerText = inputCode.padEnd(currentLevelCode.length, '-'); }
+
+    function submitCode() {
+        if(inputCode === currentLevelCode.join('')) {
+            document.getElementById('hack-terminal').style.display = 'none';
+            if(level < 2) loadLevel(2); else if(level === 2) loadLevel(3);
+        } else {
+            document.getElementById('hack-terminal').style.display = 'none';
+            // YANLIŞ ŞİFRE CEZASI: BÖLÜMÜ SIFIRLA
+            gameOver("ŞİFRE HATALI - BÖLÜM SIFIRLANDI");
+        }
+    }
+
+    function drawGame() {
+        ctx.save();
+        if(gameState !== "BOSS") ctx.translate(-cameraX, 0);
+
+        // Platformlar
+        ctx.fillStyle = "#111"; ctx.strokeStyle = "#0f0"; ctx.lineWidth = 2;
+        platforms.forEach(p => { ctx.fillRect(p.x, p.y, p.w, p.h); ctx.strokeRect(p.x, p.y, p.w, p.h); });
+
+        // Şifreler
+        ctx.font = "bold 30px 'Share Tech Mono'";
+        passFragments.forEach(pf => {
+            if(!pf.collected) {
+                ctx.fillStyle = "#0f0"; ctx.shadowBlur = 10; ctx.shadowColor = "#0f0";
+                ctx.fillText(pf.val, pf.x, pf.y); ctx.shadowBlur = 0;
+            }
+        });
+
+        obstacles.forEach(o => {
+            if(o.type === 'DOOR') {
+                ctx.fillStyle = "#222"; ctx.fillRect(o.x, o.y, o.w, o.h);
+                ctx.fillStyle = "#0f0"; ctx.fillText("KİLİTLİ", o.x + 10, o.y - 10);
+            } else { ctx.fillStyle = "#555"; ctx.fillRect(o.x, o.y, o.w, o.h); }
+        });
+
+        traps.forEach(t => { ctx.fillStyle = "yellow"; ctx.fillRect(t.x, t.y, t.w, t.h); });
+
+        // Oyuncu
+        drawChar(player.x, player.y, player.w, player.h, "#0f0");
+
+        // DÜŞMAN ÇİZİMİ (YAZILI KAĞIDI GİBİ)
+        enemies.forEach(e => {
+            if(frame < 180) ctx.globalAlpha = 0.5;
+            // Beyaz Kağıt
+            ctx.fillStyle = "white"; 
+            ctx.fillRect(e.x, e.y, e.w, e.h);
+            // Üzerine Kırmızı Yazı
+            ctx.fillStyle = "red";
+            ctx.font = "bold 16px Arial";
+            ctx.fillText("SINAV", e.x + 5, e.y + 30);
+            ctx.fillText("FİNAL", e.x + 5, e.y + 50);
+            
+            ctx.globalAlpha = 1.0;
+            if(e.stunned > 0) ctx.fillText("DURDU", e.x, e.y - 20);
+        });
+
+        if(gameState === "BOSS") {
+            ctx.fillStyle = "#300"; ctx.fillRect(boss.x, boss.y, 200, 250);
+            ctx.fillStyle = "#0f0"; ctx.fillRect(boss.x, boss.y - 20, 200 * (boss.hp/100), 10);
+            bossProjectiles.forEach(p => { ctx.fillStyle = "white"; ctx.fillText(p.txt, p.x, p.y); });
+            playerProjectiles.forEach(p => { ctx.fillStyle = "#0f0"; ctx.fillRect(p.x, p.y, 20, 5); });
+        }
+
+        particles.forEach((p, i) => {
+            ctx.fillStyle = p.col; ctx.fillRect(p.x, p.y, 4, 4);
+            p.y += p.vy; p.x += p.vx; p.life--; if(p.life <= 0) particles.splice(i, 1);
+        });
+
+        ctx.restore();
+    }
+
+    function drawChar(x, y, w, h, col) {
+        ctx.fillStyle = col; ctx.shadowBlur = 10; ctx.shadowColor = col;
+        ctx.fillRect(x, y, w, h); ctx.shadowBlur = 0;
+        ctx.fillStyle = "black"; ctx.fillRect(x + w/2, y + 10, w/2, 10);
+    }
+
+    let rainDrops = [];
+    function drawMatrixRain() {
+        if(frame % 2 === 0) rainDrops.push({x: Math.random()*canvas.width, y: -20, speed: Math.random()*10+5, char: String.fromCharCode(0x30A0 + Math.random()*96)});
+        ctx.fillStyle = "#0f0"; ctx.font = "14px monospace";
+        rainDrops.forEach((r, i) => { ctx.fillText(r.char, r.x, r.y); r.y += r.speed; if(r.y > canvas.height) rainDrops.splice(i, 1); });
+    }
+
+    function checkCol(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
+    function createParticles(x, y, col) { for(let i=0; i<10; i++) particles.push({x, y, vx:(Math.random()-0.5)*5, vy:(Math.random()-0.5)*5, life:20, col}); }
+
+    function drawUI() {
+        document.getElementById('dist-display').innerText = Math.floor(player.x / 100);
+        let displayCode = "";
+        for(let i=0; i<currentLevelCode.length; i++) {
+            if(i < player.collectedCode.length) displayCode += player.collectedCode[i] + " ";
+            else displayCode += "_ ";
+        }
+        document.getElementById('collected-pass').innerText = displayCode;
+        document.getElementById('hp-display').innerText = player.hp;
+        document.getElementById('hp-bar').style.width = player.hp + "%";
+        document.getElementById('trap-display').innerText = player.traps;
+    }
+
+    window.addEventListener('mousedown', () => { if(gameState === "BOSS") playerProjectiles.push({x: player.x+40, y: player.y+40, vx: 15}); });
+    
+    function gameOver(reason) {
+        gameState = "OVER";
+        document.getElementById('game-over').style.display = 'flex';
+        document.getElementById('death-reason').innerText = reason;
+    }
+
+</script>
+</body>
+</html>

@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>İhlas Koleji - Güvenli Giriş Sistemi</title>
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; overflow: hidden; background-color: #f4f4f4; user-select: none; }
+        .page { display: none; width: 100vw; height: 100vh; flex-direction: column; align-items: center; justify-content: center; position: absolute; top: 0; left: 0; }
+        .active { display: flex; }
+
+        /* INPUT VE BUTONLAR */
+        input { padding: 10px; font-size: 18px; text-align: center; border: 2px solid #ccc; border-radius: 5px; width: 200px; margin-top: 5px; }
+        button { padding: 10px 20px; font-size: 16px; background: #003366; color: white; border: none; cursor: pointer; margin-top: 10px; border-radius: 5px; transition: 0.2s; }
+        button:hover { background: #002244; }
+
+        /* SAYFA 1: DINO */
+        #page1 { background: white; }
+        #game-area { width: 80%; height: 200px; border-bottom: 3px solid #333; position: relative; overflow: hidden; }
+        #dino { font-size: 60px; position: absolute; bottom: 0; left: 50px; }
+        .obstacle { position: absolute; bottom: 10px; font-size: 40px; font-weight: bold; color: #333; }
+        .jump { animation: jump 0.5s ease-out; }
+        @keyframes jump { 0% { bottom: 0; } 50% { bottom: 120px; } 100% { bottom: 0; } }
+
+        /* SAYFA 2: KAMERA */
+        #page2 { background: #111; color: #0f0; }
+        #camera-feed { width: 400px; height: 300px; border: 4px solid #0f0; background: #222; object-fit: cover; transform: scaleX(-1); }
+        .scan-line { width: 400px; height: 5px; background: #0f0; position: absolute; animation: scan 2s infinite; box-shadow: 0 0 15px #0f0; }
+        @keyframes scan { 0% { transform: translateY(-150px); } 100% { transform: translateY(150px); } }
+
+        /* SAYFA 3: ŞİFRE */
+        #page3 { background: #eee; }
+        .login-box { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; width: 300px; }
+
+        /* SAYFA 4: SAHTE İHLAS SİTESİ */
+        #page4 { background: white; align-items: flex-start; overflow-y: auto; }
+        .site-header { width: 100%; height: 80px; background: #003366; display: flex; align-items: center; padding: 0 50px; color: white; justify-content: space-between; box-sizing: border-box; }
+        .site-content { padding: 50px; text-align: center; width: 100%; }
+        #parkour-btn {
+            background: linear-gradient(45deg, #ff0000, #ff8800);
+            color: white; padding: 15px 30px; font-size: 22px; font-weight: bold;
+            border: 4px solid white; border-radius: 50px; cursor: pointer;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            animation: pulse 1s infinite;
+            position: absolute; top: 100px; right: 50px;
+        }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+        /* HACKER EKRANI */
+        #hacker-screen { background: black; z-index: 9998; color: #0f0; overflow: hidden; }
+        #matrix-canvas { position: absolute; top: 0; left: 0; z-index: 1; opacity: 0.4; }
+        #hacker-img { width: 300px; height: 300px; object-fit: contain; z-index: 2; border: 2px solid red; background: #111; margin-bottom: 20px; }
+        .hacker-msg { z-index: 2; text-align: center; background: rgba(0,0,0,0.8); padding: 20px; border: 2px solid red; animation: glitch 0.2s infinite; }
+        @keyframes glitch { 0% { transform: translate(0); } 20% { transform: translate(-2px, 2px); } 100% { transform: translate(0); } }
+
+        /* SAYFA 5: 3D OYUN */
+        #page5 { background: linear-gradient(to bottom, #87CEEB, #E0F7FA); overflow: hidden; }
+        #game-canvas { display: block; }
+        #hud-container {
+            position: absolute; top: 10px; left: 10px;
+            background: rgba(255,255,255,0.9); padding: 15px; border-radius: 10px;
+            font-family: monospace; font-weight: bold; font-size: 16px; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        #game-input { font-size: 24px; width: 300px; border: 3px solid #003366; background: #eee; cursor: not-allowed; }
+        #level-screen { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 60px; color: #003366; font-weight: bold; display: none; text-shadow: 3px 3px white; z-index: 10; }
+
+    </style>
+</head>
+<body>
+
+    <div id="page1" class="page active">
+        <h2>Güvenlik Doğrulaması</h2>
+        <div id="game-area"><div id="dino">🏃‍♂️</div></div>
+        <p>Sayıları Gir:</p>
+        <input type="text" id="dino-input" placeholder="Kod..." maxlength="8">
+        <button onclick="checkDino()">GÖNDER</button>
+    </div>
+
+    <div id="page2" class="page">
+        <h2>YÜZ TANIMA</h2>
+        <div style="display: flex; justify-content: center; align-items: center; height: 300px;">
+            <video id="camera-feed" autoplay playsinline></video>
+            <div class="scan-line"></div>
+        </div>
+        <h3 id="scan-status">Taranıyor...</h3>
+    </div>
+
+    <div id="page3" class="page">
+        <div class="login-box">
+            <div style="font-size: 50px;">🎓</div>
+            <h2 style="color: #003366;">İhlas Koleji Giriş</h2>
+            <p>Öğrenci Şifresi:</p>
+            <input type="password" id="pass-input" placeholder="Şifre">
+            <br>
+            <button onclick="checkPass()">GİRİŞ YAP</button>
+        </div>
+    </div>
+
+    <div id="hacker-screen" class="page">
+        <canvas id="matrix-canvas"></canvas>
+        <img id="hacker-img" src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Anonymous_emblem.svg/1200px-Anonymous_emblem.svg.png">
+        <div class="hacker-msg">
+            <h1 style="color:red; font-size: 40px; margin: 0;">SENİ HACKLERİM!</h1>
+            <p style="color: white; font-size: 20px;">SİSTEM ELE GEÇİRİLDİ...</p>
+        </div>
+    </div>
+
+    <div id="page4" class="page">
+        <div class="site-header">
+            <h1>İHLAS KOLEJİ</h1>
+            <span>Öğrenci Paneli | Çıkış Yap</span>
+        </div>
+        <div class="site-content">
+            <h2 style="color: #333;">Hoşgeldiniz, Öğrenci.</h2>
+            <p>Ders programı ve not bilgileri yükleniyor...</p>
+            <div style="width: 100%; height: 300px; background: #eee; margin-top: 20px; display: flex; align-items: center; justify-content: center;">
+                Yükleniyor...
+            </div>
+        </div>
+        <button id="parkour-btn" onclick="startParkourGame()">🎮 PARKUR OYNA</button>
+    </div>
+
+    <div id="page5" class="page">
+        <canvas id="game-canvas"></canvas>
+        <div id="hud-container">
+            <div>LEVEL: <span id="lvl-display">1</span> | SÜRE: <span id="time-display">80</span></div>
+            <br>
+            <div>TOPLANANLAR:</div>
+            <input type="text" id="game-input" placeholder="Zıplayarak topla..." readonly>
+            <div style="font-size: 13px; margin-top:5px; color:#0055aa; font-weight:bold;">
+                🔵 TÜM KARAKTERLER GÜVENLİ!
+            </div>
+        </div>
+        <div id="level-screen">LEVEL 1</div>
+    </div>
+
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let generatedCode = "";
+
+        // === DINO BÖLÜMÜ ===
+        function startDino() {
+            generatedCode = "";
+            for(let i=0; i<8; i++) generatedCode += Math.floor(Math.random()*10);
+            console.log("Kod:", generatedCode);
+            let i=0;
+            const area = document.getElementById('game-area');
+            const dino = document.getElementById('dino');
+            function spawn() {
+                if(i>=8) return;
+                let obs = document.createElement('div');
+                obs.className = 'obstacle';
+                obs.innerText = generatedCode[i];
+                obs.style.left = '100%';
+                area.appendChild(obs);
+                let pos = 100;
+                let timer = setInterval(()=>{
+                    pos -= 2;
+                    obs.style.left = pos+'%';
+                    if(pos<20 && pos>10) { dino.classList.add('jump'); setTimeout(()=>dino.classList.remove('jump'), 500); }
+                    if(pos<-10) { clearInterval(timer); obs.remove(); i++; setTimeout(spawn, 500); }
+                }, 20);
+            }
+            setTimeout(spawn, 1000);
+        }
+
+        function checkDino() {
+            if(document.getElementById('dino-input').value === generatedCode) {
+                switchPage('page2');
+                startCamera();
+            } else {
+                alert("Hatalı Kod!");
+                document.getElementById('dino-input').value = "";
+                startDino();
+            }
+        }
+
+        // === KAMERA ===
+        function startCamera() {
+            const vid = document.getElementById('camera-feed');
+            if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({video:true}).then(s => vid.srcObject=s).catch(e=>console.log(e));
+            }
+            setTimeout(()=>{
+                document.getElementById('scan-status').innerText = "DOĞRULANDI ✅";
+                setTimeout(()=>switchPage('page3'), 1500);
+            }, 3000);
+        }
+
+        // === ŞİFRE ===
+        function checkPass() {
+            const val = document.getElementById('pass-input').value;
+            if(val === "İK1996") {
+                switchPage('page4');
+            } else {
+                switchPage('hacker-screen');
+                startMatrix();
+                playEvilLaugh(); 
+            }
+        }
+
+        // === KAHKAHA ===
+        function playEvilLaugh() {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            for(let i=0; i<3; i++) {
+                setTimeout(() => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.2);
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime); 
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.2);
+                }, i * 300);
+            }
+        }
+
+        // === MATRIX ===
+        function startMatrix() {
+            const canvas = document.getElementById('matrix-canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            const chars = "0101HACKED";
+            const font_size = 14;
+            const columns = canvas.width/font_size;
+            const drops = Array(Math.floor(columns)).fill(1);
+            function draw() {
+                ctx.fillStyle = "rgba(0, 0, 0, 0.05)";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = "#0F0";
+                ctx.font = font_size + "px arial";
+                for(let i=0; i<drops.length; i++){
+                    const text = chars[Math.floor(Math.random()*chars.length)];
+                    ctx.fillText(text, i*font_size, drops[i]*font_size);
+                    if(drops[i]*font_size > canvas.height && Math.random() > 0.975) drops[i] = 0;
+                    drops[i]++;
+                }
+            }
+            setInterval(draw, 35);
+        }
+
+        function switchPage(id) {
+            document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+        window.onload = startDino;
+
+        // =========================================================
+        // === 3D PARKUR OYUNU (GÜVENLİ MOD) ===
+        // =========================================================
+        
+        let canvas, ctx;
+        let player = { x: 50, y: 300, w: 30, h: 50, vy: 0, grounded: false, speed: 5 };
+        let keys = {};
+        let platforms = [];
+        let cameraX = 0;
+        let level = 1;
+        let timeLeft = 80;
+        let gameInterval, timerInterval, dropInterval;
+        let boss = { x: -1000, active: false, speed: 3 };
+        const symbolsPool = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-*/=?!@#$";
+
+        function startParkourGame() {
+            switchPage('page5');
+            canvas = document.getElementById('game-canvas');
+            ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+            window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+            
+            loadLevel(1);
+        }
+
+        function loadLevel(lvl) {
+            level = lvl;
+            document.getElementById('lvl-display').innerText = level;
+            levelScreen(`LEVEL ${level}`);
+            
+            timeLeft = 90 - (level * 10); 
+            if(timeLeft < 15) timeLeft = 15;
+
+            player.x = 50;
+            player.y = 300;
+            player.vy = 0;
+            cameraX = 0;
+            
+            document.getElementById('game-input').value = ""; 
+            
+            platforms = [];
+            // Başlangıç Zemini
+            platforms.push({x: 0, y: 400, w: 200, h: 50, type: 'ground', char: null, color: 'gray'}); 
+            
+            let currentX = 200;
+            let length = level === 8 ? 60 : 15 + level * 2; 
+
+            for(let i=0; i<length; i++) {
+                let gap = 50 + (level * 8) + Math.random() * 40;
+                let width = 100;
+                let heightChange = (Math.random() - 0.5) * (level * 20);
+                let y = 400 + heightChange;
+                if(y > 500) y = 500; if(y < 250) y = 250;
+
+                // %60 ihtimalle üzerinde bir karakter olsun
+                let hasChar = Math.random() > 0.4;
+                let charVal = null;
+                // RENK HEP MAVİ VE GÜVENLİ
+                let col = '#0066FF'; 
+                
+                if(hasChar) {
+                    charVal = symbolsPool.charAt(Math.floor(Math.random() * symbolsPool.length));
+                }
+
+                platforms.push({x: currentX + gap, y: y, w: width, h: 40, type: 'normal', char: charVal, color: col, collected: false});
+                currentX += gap + width;
+            }
+            
+            platforms.push({x: currentX + 100, y: 350, w: 50, h: 400, type: 'finish', char: null});
+
+            boss.active = (level === 8);
+            if(boss.active) {
+                boss.x = -200;
+                boss.speed = 6;
+                if(dropInterval) clearInterval(dropInterval);
+                dropInterval = setInterval(dropPlatform, 3000); 
+            } else {
+                if(dropInterval) clearInterval(dropInterval);
+            }
+
+            if(gameInterval) clearInterval(gameInterval);
+            if(timerInterval) clearInterval(timerInterval);
+            
+            gameInterval = setInterval(updateGame, 1000/60);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('time-display').innerText = timeLeft;
+                if(timeLeft <= 0) gameOver("SÜRE BİTTİ!");
+            }, 1000);
+        }
+
+        function dropPlatform() {
+            for(let i=0; i<platforms.length; i++) {
+                if(platforms[i].type === 'normal') {
+                    platforms[i].y += 1000;
+                    platforms[i].type = 'dropped';
+                    break; 
+                }
+            }
+        }
+
+        function updateGame() {
+            if(keys['d']) player.x += player.speed;
+            if(keys['a']) player.x -= player.speed;
+            if(keys[' '] && player.grounded) { player.vy = -16; player.grounded = false; }
+
+            player.vy += 0.8;
+            player.y += player.vy;
+            player.grounded = false;
+
+            platforms.forEach(p => {
+                if(p.type !== 'dropped' && player.x < p.x + p.w && player.x + player.w > p.x &&
+                   player.y + player.h > p.y && player.y + player.h < p.y + p.h + 25 &&
+                   player.vy >= 0) {
+                       
+                       player.grounded = true;
+                       player.vy = 0;
+                       player.y = p.y - player.h;
+
+                       // GÜVENLİ TOPLAMA
+                       if(p.char !== null && !p.collected) {
+                           p.collected = true; 
+                           document.getElementById('game-input').value += p.char;
+                       }
+
+                       if(p.type === 'finish') nextLevel();
+                   }
+            });
+
+            if(player.y > canvas.height) gameOver("AŞAĞI DÜŞTÜN!");
+
+            if(boss.active) {
+                boss.x += boss.speed;
+                if(player.x < boss.x + 300) { gameOver("BOSS YAKALADI!"); return; }
+            }
+
+            cameraX = player.x - 200;
+            drawGame();
+        }
+
+        function drawCube(x, y, w, h, frontColor, sideColor, topColor) {
+            let depth = 20; 
+            ctx.fillStyle = topColor;
+            ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x+depth, y-depth); ctx.lineTo(x+w+depth, y-depth); ctx.lineTo(x+w, y); ctx.fill();
+            ctx.fillStyle = sideColor;
+            ctx.beginPath(); ctx.moveTo(x+w, y); ctx.lineTo(x+w+depth, y-depth); ctx.lineTo(x+w+depth, y+h-depth); ctx.lineTo(x+w, y+h); ctx.fill();
+            ctx.fillStyle = frontColor;
+            ctx.fillRect(x, y, w, h);
+        }
+
+        function drawGame() {
+            let skyColor = level === 8 ? "#330000" : "#87CEEB"; 
+            ctx.fillStyle = skyColor;
+            ctx.fillRect(0,0,canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(-cameraX, 0);
+
+            platforms.forEach(p => {
+                if(p.type === 'dropped') return;
+                
+                if(p.type === 'finish') {
+                    drawCube(p.x, p.y, p.w, p.h, "#FFD700", "#DAA520", "#FFFF00");
+                    ctx.fillStyle = "black"; ctx.font = "bold 20px Arial"; ctx.fillText("FINISH", p.x, p.y + 50);
+                } else {
+                    let f = "#8B4513", s = "#5c2e0c", t = "#228B22";
+                    if(level === 8) { f="#333"; s="#000"; t="#555"; }
+                    drawCube(p.x, p.y, p.w, p.h, f, s, t);
+
+                    if(p.char !== null && !p.collected) {
+                        ctx.fillStyle = p.color; // Mavi
+                        ctx.font = "bold 30px Arial";
+                        ctx.fillText(p.char, p.x + p.w/2 - 10, p.y - 5);
+                    }
+                }
+            });
+
+            drawCube(player.x, player.y, player.w, player.h, "#0000FF", "#00008B", "#4169E1");
+
+            if(boss.active) {
+                ctx.fillStyle = "red"; ctx.fillRect(boss.x, 0, 300, canvas.height);
+                ctx.fillStyle = "black"; ctx.font = "100px Arial"; ctx.fillText("KAÇ!", boss.x + 50, 300);
+            }
+
+            ctx.restore();
+        }
+
+        function nextLevel() {
+            if(level === 8) winGame();
+            else { level++; loadLevel(level); }
+        }
+
+        function gameOver(msg) {
+            clearInterval(gameInterval); clearInterval(timerInterval); clearInterval(dropInterval);
+            document.getElementById('level-screen').innerText = msg;
+            document.getElementById('level-screen').style.display = 'block';
+            setTimeout(() => loadLevel(level), 2000); 
+        }
+
+        function winGame() {
+            clearInterval(gameInterval); clearInterval(timerInterval); clearInterval(dropInterval);
+            document.getElementById('level-screen').innerText = "KAZANDIN! DÖNÜLÜYOR...";
+            document.getElementById('level-screen').style.display = 'block';
+            setTimeout(() => { switchPage('page4'); }, 3000);
+        }
+
+        function levelScreen(text) {
+            const screen = document.getElementById('level-screen');
+            screen.innerText = text;
+            screen.style.display = 'block';
+            setTimeout(() => screen.style.display = 'none', 1500);
+        }
+
+    </script>
+</body>
+</html>

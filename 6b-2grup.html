@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QUEEN - Secure System</title>
+
+    <style>
+        /* --- CSS Stilleri --- */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: #343a40;
+            background-color: #000;
+            overflow: hidden;
+        }
+
+        /* Matrix Kanvası */
+        #matrix-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            z-index: 1;
+        }
+
+        .screen {
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            max-width: 450px;
+            width: 90%;
+            transition: all 0.5s ease;
+            opacity: 0;
+            visibility: hidden;
+            position: absolute;
+            border: 2px solid #ff69b4;
+            z-index: 10;
+        }
+
+        .screen.active {
+            opacity: 1;
+            visibility: visible;
+            position: relative;
+        }
+
+        /* Kamera ve Tarama Alanı */
+        #camera-container {
+            position: relative;
+            width: 220px;
+            height: 220px;
+            margin: 20px auto;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 4px solid #ff69b4;
+            background: #222;
+        }
+
+        #webcam { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+
+        .scan-line {
+            position: absolute; top: 0; left: 0; width: 100%; height: 4px;
+            background: rgba(255, 105, 180, 0.8); box-shadow: 0 0 15px #ff69b4;
+            animation: scan 2s infinite ease-in-out; z-index: 11;
+        }
+
+        @keyframes scan { 0% { top: 0; } 50% { top: 100%; } 100% { top: 0; } }
+
+        #progress-container { width: 100%; height: 10px; background: #eee; border-radius: 5px; margin: 15px 0; display: none; overflow: hidden; }
+        #progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #ff69b4, #007bff); transition: width 0.1s linear; }
+
+        #auth-controls { display: none; margin-top: 15px; }
+
+        /* Ciddi Hata Ekranı Overlay */
+        #error-overlay {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+            text-align: center;
+        }
+
+        #error-overlay img {
+            width: 200px;
+            border-radius: 10px;
+            filter: drop-shadow(0 0 10px red);
+            margin-bottom: 20px;
+        }
+
+        .hack-text {
+            color: #00ff41;
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            font-size: 2.5em;
+            text-shadow: 0 0 10px #00ff41;
+            letter-spacing: 2px;
+        }
+
+        h1 { color: #007bff; margin: 10px 0; font-size: 1.8em; }
+        input[type="password"], input[type="text"], select {
+            width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 6px; border: 1px solid #ddd; text-align: center; font-size: 1em;
+        }
+        button { background-color: #28a745; color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; }
+        #logout-button { background-color: #dc3545; margin-top: 20px; }
+        .result-area { margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 6px; background-color: #f8f9fa; }
+    </style>
+</head>
+<body>
+
+    <canvas id="matrix-canvas"></canvas>
+
+    <div id="login-screen" class="screen active">
+        <h1 style="color: #ff69b4;">👑 QUEEN</h1>
+        <p id="status-text">Biyometrik tarama için izin bekleniyor...</p>
+
+        <div id="camera-container">
+            <div class="scan-line" id="scanner"></div>
+            <video id="webcam" autoplay playsinline></video>
+        </div>
+
+        <div id="progress-container">
+            <div id="progress-fill"></div>
+        </div>
+
+        <div id="auth-controls">
+            <p><strong>Kimlik Doğrulandı.</strong> Lütfen anahtar şifreyi girin:</p>
+            <input type="password" id="password-input" placeholder="Sistem Şifresi">
+            <button id="login-button">Sisteme Giriş Yap</button>
+        </div>
+    </div>
+
+    <div id="error-overlay">
+        <div class="hack-text">SİSTEME SIZILDI!</div>
+        <img src="https://cdn-icons-png.flaticon.com/512/752/752755.png" alt="Erişim Engellendi">
+        <div class="hack-text" style="font-size: 1.5em;">ERİŞİM REDDEDİLDİ</div>
+    </div>
+
+    <div id="password-generator-screen" class="screen">
+        <h1 style="color: #ff69b4;">QUEEN PANEL</h1>
+        <h2>✨ Şifre Oluşturucu</h2>
+        <p>Uzunluk seçin:</p>
+        <select id="password-length"></select>
+        <button id="generate-button" style="margin-top:10px">Yeni Şifre Oluştur</button>
+        
+        <div class="result-area">
+            <input type="text" id="generated-password" readonly placeholder="Oluşturulan şifre...">
+            <button id="copy-button" style="background-color: #17a2b8; margin-top: 10px;">Kopyala</button>
+        </div>
+        
+        <button id="logout-button">Oturumu Kapat</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('matrix-canvas');
+        const ctx = canvas.getContext('2d');
+        let matrixInterval;
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*";
+        const fontSize = 16;
+        const columns = canvas.width / fontSize;
+        const drops = Array(Math.floor(columns)).fill(1);
+
+        function drawMatrix() {
+            ctx.fillStyle = "rgba(0, 0, 0, 0.05)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#0F0";
+            ctx.font = fontSize + "px Courier New";
+
+            for (let i = 0; i < drops.length; i++) {
+                const text = characters.charAt(Math.floor(Math.random() * characters.length));
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+                drops[i]++;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const webcam = document.getElementById('webcam');
+            const statusText = document.getElementById('status-text');
+            const progressContainer = document.getElementById('progress-container');
+            const progressFill = document.getElementById('progress-fill');
+            const authControls = document.getElementById('auth-controls');
+            const loginScreen = document.getElementById('login-screen');
+            const errorOverlay = document.getElementById('error-overlay');
+            const generatorScreen = document.getElementById('password-generator-screen');
+            const passwordInput = document.getElementById('password-input');
+            
+            const CORRECT_PASSWORD = '16106';
+
+            async function startCamera() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    webcam.srcObject = stream;
+                    let progress = 0;
+                    statusText.textContent = "Biyometrik veriler analiz ediliyor...";
+                    progressContainer.style.display = "block";
+                    
+                    const timer = setInterval(() => {
+                        progress += 2;
+                        progressFill.style.width = progress + "%";
+                        if (progress >= 100) {
+                            clearInterval(timer);
+                            statusText.textContent = "✅ Kimlik Onaylandı!";
+                            statusText.style.color = "#28a745";
+                            progressContainer.style.display = "none";
+                            authControls.style.display = "block";
+                        }
+                    }, 50);
+                } catch (err) { 
+                    statusText.textContent = "Kamera erişimi sağlanamadı. Manuel giriş aktif."; 
+                    authControls.style.display = "block";
+                }
+            }
+
+            document.getElementById('login-button').addEventListener('click', () => {
+                if (passwordInput.value === CORRECT_PASSWORD) {
+                    loginScreen.classList.remove('active');
+                    generatorScreen.classList.add('active');
+                } else {
+                    // HATA DURUMU
+                    loginScreen.style.opacity = "0";
+                    canvas.style.display = "block";
+                    errorOverlay.style.display = "block";
+                    matrixInterval = setInterval(drawMatrix, 35);
+
+                    setTimeout(() => {
+                        clearInterval(matrixInterval);
+                        canvas.style.display = "none";
+                        errorOverlay.style.display = "none";
+                        loginScreen.style.opacity = "1";
+                        passwordInput.value = "";
+                        passwordInput.focus();
+                    }, 4000);
+                }
+            });
+
+            // Şifre Üretici
+            const lengthSelect = document.getElementById('password-length');
+            for(let i=8; i<=24; i++){
+                let opt = document.createElement('option'); opt.value=i; opt.innerHTML=i+" Karakter";
+                lengthSelect.appendChild(opt);
+            }
+            lengthSelect.value = 12;
+
+            document.getElementById('generate-button').addEventListener('click', () => {
+                const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+                let pass = "";
+                for(let i=0; i<lengthSelect.value; i++) pass += chars.charAt(Math.floor(Math.random()*chars.length));
+                document.getElementById('generated-password').value = pass;
+            });
+
+            document.getElementById('copy-button').addEventListener('click', () => {
+                const p = document.getElementById('generated-password');
+                p.select();
+                navigator.clipboard.writeText(p.value);
+            });
+
+            document.getElementById('logout-button').addEventListener('click', () => location.reload());
+            startCamera();
+        });
+    </script>
+</body>
+</html>

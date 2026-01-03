@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>SCP: KARANLIK PROTOKOL - FINAL</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/controls/PointerLockControls.js"></script>
+
+    <style>
+        /* --- TEMEL AYARLAR --- */
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Courier New', monospace; user-select: none; }
+        
+        /* --- ARAYÜZ KATMANLARI (Tüm ekranı kaplayanlar) --- */
+        #start-screen, #security-check, #click-blocker, #jumpscare, #win-overlay, #end-credits {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+
+        /* Başlangıç Ekranı */
+        #start-screen { background: #000; z-index: 200; color: #0f0; }
+        .btn {
+            background: #000; color: #0f0; border: 2px solid #0f0; padding: 20px 40px;
+            margin: 10px; font-size: 1.5rem; cursor: pointer; text-transform: uppercase;
+            font-weight: bold; width: 300px; text-align: center; transition: 0.3s;
+        }
+        .btn:hover { background: #0f0; color: #000; box-shadow: 0 0 25px #0f0; }
+
+        /* Kamera Tarama */
+        #security-check { background: #000; z-index: 300; display: none; color: #0f0; }
+        #camera-container {
+            position: relative; width: 640px; height: 480px;
+            border: 4px solid #0f0; background: #050505;
+            box-shadow: 0 0 20px #0f0; overflow: hidden;
+        }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        #scan-line {
+            position: absolute; top: 0; left: 0; width: 100%; height: 5px;
+            background: rgba(0, 255, 0, 0.8); box-shadow: 0 0 10px #0f0;
+            animation: scanAnim 1.5s infinite linear;
+        }
+        @keyframes scanAnim { 0% { top: 0%; } 50% { top: 100%; } 100% { top: 0%; } }
+
+        /* Oyun İçi HUD */
+        #hud { display: none; pointer-events: none; width: 100%; height: 100%; position: absolute; top:0; left:0; z-index: 100; }
+        #crosshair {
+            position: absolute; top: 50%; left: 50%; width: 4px; height: 4px;
+            background-color: rgba(255, 255, 255, 0.5); border-radius: 50%;
+            transform: translate(-50%, -50%); box-shadow: 0 0 2px white;
+        }
+        #stats-container {
+            position: absolute; bottom: 20px; left: 20px; color: white;
+            background: rgba(0,0,0,0.5); padding: 15px; border-radius: 5px;
+            border: 1px solid #333;
+        }
+        .stat-bar { height: 12px; background: #111; width: 200px; margin-bottom: 5px; border: 1px solid #333; }
+        .stat-fill { height: 100%; background: #0f0; width: 100%; transition: width 0.2s; }
+        
+        #password-display {
+            font-size: 2rem; letter-spacing: 10px; color: #ffff00;
+            text-shadow: 0 0 10px orange; margin-top: 10px; font-weight: bold;
+        }
+
+        #interaction-msg {
+            position: absolute; top: 60%; left: 50%; transform: translate(-50%, 0);
+            color: #fff; background: rgba(0,0,0,0.6); padding: 8px 15px; border-radius: 4px;
+            font-weight: bold; display: none; font-size: 1.2rem; border: 1px solid #555;
+        }
+
+        /* Diğer Ekranlar */
+        #click-blocker { display: none; background: rgba(0,0,0,0.95); z-index: 190; color: white; cursor: pointer; }
+        #jumpscare { display: none; background: black; z-index: 999; }
+        #jumpscare img { width: 100%; height: 100%; object-fit: cover; }
+        
+        #win-overlay {
+            display: none; pointer-events: none; z-index: 500;
+            background: transparent;
+        }
+        .win-text {
+            font-size: 4rem; color: #0f0; text-align: center;
+            text-shadow: 0 0 20px #0f0, 0 0 40px #0f0;
+            animation: textPulse 2s infinite alternate;
+            background: rgba(0,0,0,0.7); padding: 20px; border: 2px solid #0f0;
+        }
+        @keyframes textPulse { from { transform: scale(1); opacity: 0.8; } to { transform: scale(1.05); opacity: 1; } }
+
+        #inventory-panel {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(5, 10, 5, 0.98); border: 1px solid #0f0; padding: 20px;
+            color: #0f0; display: none; text-align: center; z-index: 150; width: 300px;
+        }
+
+        /* --- KAPANIŞ JENERİĞİ (CREDITS) --- */
+        #end-credits {
+            display: none; background: #000; z-index: 2000;
+            overflow: hidden; justify-content: flex-end; /* Yazılar alttan gelecek */
+        }
+        #scrolling-text {
+            text-align: center; color: #0f0; font-size: 1.5rem; line-height: 2;
+            width: 80%;
+            position: relative;
+            animation: scrollUp 25s linear forwards; /* Süreyi biraz uzattım */
+            top: 100%; /* Ekranın altından başla */
+            padding-bottom: 100px;
+        }
+        @keyframes scrollUp {
+            0% { top: 100%; transform: translateY(0); }
+            100% { top: -200%; transform: translateY(0); } /* Daha yukarı çıksın */
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="start-screen">
+    <h1 style="color:red; letter-spacing:5px; text-shadow: 0 0 10px red;">SCP: PROTOKOL</h1>
+    <p>GÖREV: ŞİFRE PARÇALARINI TOPLA.</p>
+    <div class="btn" onclick="startBiometricScan()">SİSTEME GİRİŞ YAP</div>
+</div>
+
+<div id="security-check">
+    <h2 style="margin-bottom: 10px;">BİYOMETRİK TARAMA</h2>
+    <div id="camera-container">
+        <video id="webcam" autoplay playsinline></video>
+        <div id="scan-line"></div>
+    </div>
+    <div id="scan-status" style="margin-top:20px; font-size:2rem; font-weight:bold;">YÜZ ARANIYOR...</div>
+</div>
+
+<div id="click-blocker">
+    <h1 id="blocker-title" style="font-size: 3rem; color: yellow;"></h1>
+    <p id="blocker-sub">Devam etmek için ekrana tıklayın</p>
+</div>
+
+<div id="win-overlay">
+    <div class="win-text">GÜVENLİ ŞİFRE<br>OLUŞTURULDU</div>
+</div>
+
+<div id="end-credits">
+    <div id="scrolling-text">
+        <h1 style="color:white; text-shadow: 0 0 10px white;">GÖREV TAMAMLANDI</h1>
+        <br><br>
+        <p>YAPIMCI EKİP</p>
+        <h2 style="color:yellow;">6. SINIF ERKEK ÖĞRENCİ GRUBU</h2>
+        <br>
+        <p>KODLAMA & TASARIM</p>
+        <p style="font-weight: bold; color: #00ff00;">AHMET HASAN AKTÜRK</p>
+        <p style="font-weight: bold; color: #00ff00;">ALİ SUAT HALICI</p>
+        <p style="font-weight: bold; color: #00ff00;">ABDÜLHAMİD MİRZA SEYHAN</p>
+        <p style="font-weight: bold; color: #00ff00;">AHMET SELİM GÜLTEKİN</p>
+        <br><br>
+        <p>--- GELİŞTİRİCİ NOTU ---</p>
+        <p>Bu oyunu yapmak bizim için çok kolaydı...</p>
+        <p>Umarım oynarken keyif almışsındır.</p>
+        <br>
+        <p style="color:red; font-weight:bold; font-size: 2rem; border: 1px dashed red; padding: 10px; display: inline-block;">ÖNEMLİ DERS!</p>
+        <br><br>
+        <p>Artık internette şifrelerini</p>
+        <p>"1 2 3 4 5" veya "password"</p>
+        <p>gibi basit şeyler koymaman gerektiğini öğrenmişsindir!</p>
+        <br><br>
+        <p>Güvenli günler dileriz...</p>
+        <br><br><br>
+        <p style="color:#555;">Sistem Kapatılıyor... [BAĞLANTI KESİLDİ]</p>
+    </div>
+</div>
+
+<div id="hud">
+    <div id="crosshair"></div>
+    <div id="interaction-msg"></div>
+    <div id="stats-container">
+        <div>FENER GÜCÜ [% <span id="battery-txt">100</span>]</div>
+        <div class="stat-bar"><div id="battery-bar" class="stat-fill"></div></div>
+        <div style="margin-top:15px; color:#aaa; font-size: 0.8rem;">GÜVENLİK KODU DURUMU:</div>
+        <div id="password-display">_ _ _ _ _ _ _ _</div>
+    </div>
+</div>
+
+<div id="inventory-panel">
+    <h2>ENVANTER</h2>
+    <p>Piller: <strong id="inv-batteries">0</strong></p>
+    <p>Haplar: <strong id="inv-pills">0</strong></p>
+    <small>Kapat: 'E'</small>
+</div>
+
+<div id="jumpscare"><img src="https://files.catbox.moe/6c8i8j.jpg"></div>
+<div id="webgl-container"></div>
+
+<script>
+    // --- OYUN AYARLARI ---
+    const TARGET_PASSWORD = ["R", "I", "C", "K", "R", "O", "L", "L"];
+    let foundLettersMask = [false, false, false, false, false, false, false, false];
+    
+    // Değişkenler
+    let scene, camera, renderer, controls, raycaster;
+    let moveForward=false, moveBackward=false, moveLeft=false, moveRight=false;
+    let prevTime = performance.now();
+    let velocity = new THREE.Vector3(), direction = new THREE.Vector3();
+    let gameActive = false;
+    let isGameOver = false; // Oyun bitti mi kontrolü
+    
+    let scpEnemy, scpSpeed = 6.0;
+    let drawers = [];
+    
+    // Kapı değişkenleri
+    let exitDoorGroup, leftDoor, rightDoor;
+
+    let batteryLevel = 100, flashlight, isFlashlightOn = true;
+    let speedMultiplier = 1.0;
+    let inventory = { batteries: 0, pills: 0 };
+
+    // --- BAŞLANGIÇ SİSTEMİ ---
+    function startBiometricScan() {
+        document.getElementById('start-screen').style.display = 'none';
+        document.getElementById('security-check').style.display = 'flex';
+        
+        const videoEl = document.getElementById('webcam');
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+                videoEl.srcObject = stream;
+                setTimeout(() => {
+                    document.getElementById('scan-status').innerText = "DOĞRULANDI";
+                    document.getElementById('scan-status').style.color = "lime";
+                    setTimeout(() => {
+                        stream.getTracks().forEach(t => t.stop());
+                        document.getElementById('security-check').style.display = 'none';
+                        showReadyScreen();
+                    }, 1500);
+                }, 2000);
+            }).catch(() => { showReadyScreen(); });
+        } else { showReadyScreen(); }
+    }
+
+    function showReadyScreen() {
+        const b = document.getElementById('click-blocker');
+        document.getElementById('blocker-title').innerText = "SİMÜLASYON HAZIR";
+        document.getElementById('blocker-title').style.color = "lime";
+        b.style.display = 'flex';
+        b.onclick = () => { setupGame(); b.onclick = null; };
+    }
+
+    function setupGame() {
+        if(scene) { controls.lock(); return; }
+        document.getElementById('security-check').style.display = 'none';
+        init3D();
+        const b = document.getElementById('click-blocker');
+        b.addEventListener('click', () => { 
+            if(!isGameOver) {
+                b.style.display = 'none'; controls.lock(); 
+            }
+        });
+        controls.lock();
+    }
+
+    function init3D() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000000);
+        scene.fog = new THREE.Fog(0x000000, 2, 30);
+
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth/innerHeight, 0.1, 1000);
+        camera.position.set(0, 1.7, 0);
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.02));
+        flashlight = new THREE.SpotLight(0xffffff, 8);
+        flashlight.angle = Math.PI/5; flashlight.penumbra = 0.5; flashlight.distance = 100;
+        camera.add(flashlight); camera.add(flashlight.target);
+        flashlight.target.position.set(0,0,-1);
+        scene.add(camera);
+
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(200,200), new THREE.MeshStandardMaterial({color:0x111111, roughness:0.8}));
+        floor.rotation.x = -Math.PI/2; scene.add(floor);
+
+        createMaze();
+        createBigDoor();
+        createHumanoidSCP();
+
+        controls = new THREE.PointerLockControls(camera, document.body);
+        
+        controls.addEventListener('lock', () => { 
+            if(!isGameOver) {
+                gameActive = true; 
+                document.getElementById('hud').style.display='block'; 
+                document.getElementById('click-blocker').style.display='none'; 
+            }
+        });
+        
+        controls.addEventListener('unlock', () => { 
+            gameActive = false; 
+            // Eğer oyun bitmediyse duraklatma menüsünü göster
+            if(!isGameOver && document.getElementById('inventory-panel').style.display === 'none') {
+                 const b = document.getElementById('click-blocker');
+                 document.getElementById('blocker-title').innerText = "DURAKLATILDI";
+                 document.getElementById('blocker-title').style.color = "yellow";
+                 b.style.display='flex';
+            }
+        });
+        scene.add(controls.getObject());
+
+        document.addEventListener('keydown', (e) => {
+            if(isGameOver) return; // Oyun bittiyse tuşları yoksay
+            switch(e.code) {
+                case 'KeyW': moveForward=true; break;
+                case 'KeyA': moveLeft=true; break;
+                case 'KeyS': moveBackward=true; break;
+                case 'KeyD': moveRight=true; break;
+                case 'KeyB': interact(); break;
+                case 'KeyE': toggleInventory(); break;
+                case 'KeyH': usePill(); break;
+                case 'KeyT': useBattery(); break;
+            }
+        });
+        document.addEventListener('keyup', (e) => {
+            switch(e.code) {
+                case 'KeyW': moveForward=false; break;
+                case 'KeyA': moveLeft=false; break;
+                case 'KeyS': moveBackward=false; break;
+                case 'KeyD': moveRight=false; break;
+            }
+        });
+
+        raycaster = new THREE.Raycaster();
+        renderer = new THREE.WebGLRenderer({antialias:true});
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('webgl-container').appendChild(renderer.domElement);
+        window.addEventListener('resize', () => { camera.aspect=window.innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, innerHeight); });
+        
+        updatePasswordDisplay();
+        animate();
+    }
+
+    function createMaze() {
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+        for(let i=0; i<60; i++) {
+            const w = new THREE.Mesh(new THREE.BoxGeometry(4,10,4), wallMat);
+            w.position.set(Math.random()*140-70, 5, Math.random()*140-70);
+            scene.add(w);
+        }
+
+        const boxGeo = new THREE.BoxGeometry(1.5,1.5,1.5);
+        const boxMat = new THREE.MeshStandardMaterial({color: 0x5c2e00});
+        
+        let contentPool = [...TARGET_PASSWORD];
+        while(contentPool.length < 25) contentPool.push(Math.random()>0.5 ? 'battery':'pill');
+        contentPool.sort(()=>Math.random()-0.5);
+
+        for(let i=0; i<25; i++) {
+            const mesh = new THREE.Mesh(boxGeo, boxMat);
+            mesh.position.set(Math.random()*100-50, 0.75, Math.random()*100-50);
+            const edges = new THREE.LineSegments(new THREE.EdgesGeometry(boxGeo), new THREE.LineBasicMaterial({color:0xaaaa00}));
+            mesh.add(edges);
+            scene.add(mesh);
+            drawers.push({ mesh, content: contentPool[i], opened: false });
+        }
+    }
+
+    function createBigDoor() {
+        exitDoorGroup = new THREE.Group();
+        exitDoorGroup.position.set(0, 0, -60);
+        
+        const frame = new THREE.Mesh(new THREE.BoxGeometry(12, 14, 2), new THREE.MeshStandardMaterial({color:0x222222}));
+        
+        const doorMat = new THREE.MeshStandardMaterial({color:0x555555, roughness: 0.4, metalness: 0.8});
+        leftDoor = new THREE.Mesh(new THREE.BoxGeometry(5, 12, 1), doorMat);
+        leftDoor.position.set(-2.5, 0, 0);
+        rightDoor = new THREE.Mesh(new THREE.BoxGeometry(5, 12, 1), doorMat);
+        rightDoor.position.set(2.5, 0, 0);
+
+        const exitLight = new THREE.PointLight(0x00ff00, 0, 20);
+        exitLight.position.set(0, 2, -5);
+        exitDoorGroup.add(exitLight);
+        exitDoorGroup.userData = { light: exitLight };
+
+        exitDoorGroup.add(frame);
+        exitDoorGroup.add(leftDoor);
+        exitDoorGroup.add(rightDoor);
+        scene.add(exitDoorGroup);
+    }
+
+    function createHumanoidSCP() {
+        scpEnemy = new THREE.Group();
+        const mat = new THREE.MeshStandardMaterial({color:0x888888});
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.4), mat); head.position.y=2.8;
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,1.2), mat); body.position.y=1.9;
+        scpEnemy.add(head, body);
+        scpEnemy.position.set(-50, 0, 50);
+        scene.add(scpEnemy);
+    }
+
+    function interact() {
+        if(!gameActive) return;
+        raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
+        const intersects = raycaster.intersectObjects(drawers.map(d=>d.mesh));
+        
+        if(intersects.length>0 && intersects[0].distance < 6) {
+            const d = drawers.find(obj => obj.mesh === intersects[0].object);
+            if(d && !d.opened) {
+                d.opened = true;
+                d.mesh.material.color.set(0x00ff00);
+                d.mesh.children[0].visible = false; 
+                
+                if(d.content === 'battery') { inventory.batteries++; showMsg("PİL BULUNDU"); }
+                else if(d.content === 'pill') { inventory.pills++; showMsg("HAP BULUNDU"); }
+                else {
+                    const letter = d.content;
+                    let placed = false;
+                    for(let i=0; i<TARGET_PASSWORD.length; i++) {
+                        if(TARGET_PASSWORD[i] === letter && !foundLettersMask[i]) {
+                            foundLettersMask[i] = true;
+                            placed = true;
+                            break;
+                        }
+                    }
+                    if(placed) {
+                        showMsg(`ŞİFRE PARÇASI: ${letter}`);
+                        updatePasswordDisplay();
+                        checkWinCondition();
+                    } else {
+                        showMsg("GEREKSİZ PARÇA...");
+                    }
+                }
+                updateInv();
+            }
+        }
+    }
+
+    function updatePasswordDisplay() {
+        let displayStr = "";
+        for(let i=0; i<TARGET_PASSWORD.length; i++) {
+            if(foundLettersMask[i]) displayStr += TARGET_PASSWORD[i] + " ";
+            else displayStr += "_ ";
+        }
+        document.getElementById('password-display').innerText = displayStr;
+    }
+
+    function checkWinCondition() {
+        if(foundLettersMask.every(v => v === true)) {
+            triggerWinSequence();
+        }
+    }
+
+    function triggerWinSequence() {
+        // 1. Kapı Animasyonu ve Işık (Görsel şölen)
+        exitDoorGroup.userData.light.intensity = 5;
+        // Kapı açılma değişkenleri
+        leftDoor.position.x = -6; 
+        rightDoor.position.x = 6;
+        
+        // 2. Ekranda büyük yazı
+        document.getElementById('win-overlay').style.display = 'flex';
+        
+        // 3. 3 Saniye Bekle ve Credits'e geç
+        setTimeout(() => {
+            isGameOver = true;
+            gameActive = false;
+            controls.unlock(); // Mouse serbest
+
+            // HUD ve 3D sahneyi gizle
+            document.getElementById('hud').style.display = 'none';
+            document.getElementById('webgl-container').style.display = 'none';
+            document.getElementById('win-overlay').style.display = 'none';
+            
+            // Siyah arka plan ve kayan yazıyı aç
+            document.body.style.background = "black";
+            document.getElementById('end-credits').style.display = 'flex';
+        }, 3000);
+    }
+
+    function toggleInventory() {
+        const p = document.getElementById('inventory-panel');
+        if(p.style.display==='block') { p.style.display='none'; controls.lock(); }
+        else { p.style.display='block'; controls.unlock(); }
+    }
+    function useBattery() {
+        if(inventory.batteries>0) { inventory.batteries--; batteryLevel=100; updateInv(); showMsg("PİL YENİLENDİ"); }
+        else { isFlashlightOn=!isFlashlightOn; flashlight.visible=isFlashlightOn; }
+    }
+    function usePill() {
+        if(inventory.pills>0) { inventory.pills--; speedMultiplier=2.0; setTimeout(()=>speedMultiplier=1.0, 5000); updateInv(); showMsg("HIZLANDIN!"); }
+    }
+    function updateInv() { document.getElementById('inv-batteries').innerText=inventory.batteries; document.getElementById('inv-pills').innerText=inventory.pills; }
+    function showMsg(txt) {
+        const m = document.getElementById('interaction-msg');
+        m.innerText = txt; m.style.display='block';
+        if(m.timer) clearTimeout(m.timer); m.timer=setTimeout(()=>m.style.display='none', 2000);
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        if(!gameActive) return; // Oyun aktif değilse renderlamaya devam etme (CPU tasarrufu)
+
+        const time = performance.now();
+        const delta = (time - prevTime)/1000;
+        prevTime = time;
+
+        velocity.x -= velocity.x * 10.0 * delta;
+        velocity.z -= velocity.z * 10.0 * delta;
+        direction.z = Number(moveForward)-Number(moveBackward);
+        direction.x = Number(moveRight)-Number(moveLeft);
+        direction.normalize();
+        
+        const speed = 100.0 * speedMultiplier;
+        if(moveForward||moveBackward) velocity.z -= direction.z * speed * delta;
+        if(moveLeft||moveRight) velocity.x -= direction.x * speed * delta;
+        
+        controls.moveRight(-velocity.x * delta);
+        controls.moveForward(-velocity.z * delta);
+
+        if(isFlashlightOn) {
+            batteryLevel -= delta * 0.5;
+            if(batteryLevel<=0) { batteryLevel=0; flashlight.intensity=0; }
+            else flashlight.intensity = (batteryLevel/100)*8;
+            document.getElementById('battery-bar').style.width = batteryLevel+"%";
+        }
+
+        const dist = camera.position.distanceTo(scpEnemy.position);
+        if(dist < 50) { 
+            scpEnemy.lookAt(camera.position.x, 1.9, camera.position.z);
+            scpEnemy.translateZ(scpSpeed * delta);
+            if(dist < 1.5) {
+                isGameOver = true;
+                gameActive = false; controls.unlock();
+                document.getElementById('jumpscare').style.display = 'block';
+            }
+        }
+
+        renderer.render(scene, camera);
+    }
+</script>
+</body>
+</html>

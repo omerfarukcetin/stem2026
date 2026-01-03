@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>İBAM Güvenlik ve Coğrafya Oyunu</title>
+    <style>
+        /* --- TASARIM (CSS) --- */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #fdf2f8; /* Pastel Pembe Arka Plan */
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* --- SÜSLEMELER --- */
+        .susleme {
+            position: absolute;
+            font-size: 35px;
+            opacity: 0.6;
+            z-index: -1;
+            animation: suzulme 6s infinite alternate ease-in-out;
+        }
+        @keyframes suzulme {
+            from { transform: translateY(0px) rotate(0deg); }
+            to { transform: translateY(-20px) rotate(10deg); }
+        }
+
+        /* --- ANA KUTU --- */
+        .container {
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 30px;
+            box-shadow: 0 15px 35px rgba(176, 196, 222, 0.4);
+            text-align: center;
+            width: 500px; 
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 5px solid #bde0fe;
+            position: relative;
+        }
+
+        h2 { color: #8896ab; margin-top: 0; }
+        p { color: #666; }
+
+        /* --- ELEMENTLER --- */
+        #kamera {
+            width: 100%; height: 250px; background-color: #333;
+            border-radius: 15px; margin-bottom: 15px; object-fit: cover;
+            border: 4px solid #ffc1cc; transform: scaleX(-1);
+        }
+
+        input {
+            width: 90%; padding: 12px; border: 2px solid #e2e8f0;
+            border-radius: 12px; outline: none; font-size: 16px;
+            margin: 10px 0; background-color: #f8fafc; text-align: center;
+        }
+        input:focus { border-color: #bde0fe; }
+
+        .input-grubu { position: relative; width: 90%; margin: 0 auto; }
+        .goz-ikonu { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #a0c4ff; }
+        .bar-arkaplan { width: 90%; height: 10px; background-color: #eee; margin: 5px auto; border-radius: 5px; overflow: hidden; }
+        #gucCubugu { height: 100%; width: 0%; background-color: #ffb7b2; transition: width 0.4s; }
+
+        button {
+            border: none; border-radius: 12px; font-size: 16px;
+            cursor: pointer; font-weight: bold; transition: 0.3s;
+        }
+        
+        .dogrula-btn { background-color: #bde0fe; color: #555; padding: 10px 25px; margin-top: 10px; }
+        .dogrula-btn:hover { background-color: #a2d2ff; }
+
+        .oyun-gec-btn { background-color: #ffdac1; color: #555; padding: 15px 30px; font-size: 18px; margin-top: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .oyun-gec-btn:hover { background-color: #ffc8a2; transform: scale(1.05); }
+
+        /* Kaçan Çiçek */
+        #cicekButon {
+            position: absolute; top: 20px; right: 20px; width: 70px; height: 70px;
+            background-color: #ffb7b2; border-radius: 50%; font-size: 35px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1); transition: all 0.6s ease;
+            display: none; justify-content: center; align-items: center; z-index: 100;
+        }
+        #cicekButon:hover { transform: scale(1.1) rotate(20deg); }
+
+        /* --- OYUN ALANI --- */
+        .kita-listesi { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+        .kita-btn { background-color: #e2f0cb; padding: 10px 15px; font-size: 14px; border-radius: 20px; }
+        .kita-btn:hover { background-color: #c7e59b; transform: translateY(-3px); }
+
+        #ulke-haritasi-kutusu {
+            width: 250px; height: 250px; margin: 20px auto;
+            display: flex; justify-content: center; align-items: center;
+        }
+        #ulke-img { max-width: 100%; max-height: 100%; filter: drop-shadow(0 0 5px rgba(0,0,0,0.2)); }
+
+        .oyun-mesaji { font-weight: bold; font-size: 18px; margin-top: 10px; min-height: 30px; }
+        .dogru { color: #77dd77; }
+        .yanlis { color: #ff6961; }
+
+        /* --- DEĞERLENDİRME VE İSTATİSTİK --- */
+        .istatistik-kutu {
+            background-color: #f0fdf4; border: 2px solid #bde0fe;
+            border-radius: 15px; padding: 15px; margin: 20px 0;
+        }
+        .skor-yazi { font-size: 18px; color: #555; margin: 5px 0; }
+        
+        /* Ödül Yazısı: Hafif Açık Pembe */
+        .odul-yazisi {
+            color: #ffb7b2; /* Hafif pastel pembe */
+            font-size: 24px; font-weight: bold; margin-bottom: 10px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+            animation: buyuKucul 2s infinite;
+        }
+        @keyframes buyuKucul {
+            0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); }
+        }
+
+        /* Yıldızlama */
+        .yildizlar { font-size: 30px; cursor: pointer; color: #ccc; }
+        .yildizlar span:hover, .yildizlar span.secili { color: #ffd700; }
+
+        .gecis-yazisi { font-size: 22px; color: #a0c4ff; font-weight: bold; animation: parlama 1s infinite; }
+
+        .gizli { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="susleme" style="top: 5%; left: 5%;">🦋</div>
+    <div class="susleme" style="top: 15%; right: 10%;">🌸</div>
+    <div class="susleme" style="bottom: 10%; left: 15%;">🌺</div>
+    <div class="susleme" style="bottom: 25%; right: 5%;">🦋</div>
+    <div class="susleme" style="top: 50%; left: 3%;">🌼</div>
+    <div class="susleme" style="top: 10%; left: 50%;">🦋</div>
+    <div class="susleme" style="bottom: 5%; left: 50%;">🌸</div>
+
+    <div class="container">
+        
+        <div id="bolum-guvenlik">
+            <h2>Güvenlik Girişi</h2>
+            <video id="kamera" autoplay playsinline></video>
+            <p id="durumMesaji">Yüz taranıyor...</p>
+
+            <div id="sifreFormu" class="gizli">
+                <p>Hoşgeldin İnsan! Şifre oluştur:</p>
+                <div class="input-grubu">
+                    <input type="password" id="sifre1" placeholder="Yeni Şifre" onkeyup="guclulukKontrol()">
+                    <span class="goz-ikonu" onclick="sifreGoster('sifre1')">👁️</span>
+                </div>
+                <div class="bar-arkaplan"><div id="gucCubugu"></div></div>
+                <p id="sifreMesaji" style="font-size: 12px;">Şifre gücünü belirleyin.</p>
+            </div>
+        </div>
+
+        <div id="bolum-dogrulama" class="gizli">
+            <h2>Doğrulama</h2>
+            <p>Şifrenizi tekrar girin:</p>
+            <div class="input-grubu">
+                <input type="password" id="sifre2" placeholder="Şifreyi Tekrarla">
+                <span class="goz-ikonu" onclick="sifreGoster('sifre2')">👁️</span>
+            </div>
+            <button class="dogrula-btn" onclick="dogrulamaYap()">Giriş Yap</button>
+        </div>
+
+        <div id="bolum-sonuc" class="gizli">
+            <h1 style="color:#ff6961;">İBAM'A HOŞGELDİNİZ</h1>
+            <div style="font-size: 50px;">🎉🎊</div>
+            <button class="oyun-gec-btn" onclick="oyunuBaslat()">OYUNA GEÇ 🌍</button>
+        </div>
+
+        <div id="bolum-oyun-kita" class="gizli">
+            <h2>Bir Kıta Seçin</h2>
+            <p>Maceraya nereden başlayalım?</p>
+            <div class="kita-listesi">
+                <button class="kita-btn" onclick="kitaSec('Avrupa')">Avrupa</button>
+                <button class="kita-btn" onclick="kitaSec('Asya')">Asya</button>
+                <button class="kita-btn" onclick="kitaSec('Afrika')">Afrika</button>
+                <button class="kita-btn" onclick="kitaSec('Kuzey Amerika')">K. Amerika</button>
+                <button class="kita-btn" onclick="kitaSec('Güney Amerika')">G. Amerika</button>
+                <button class="kita-btn" onclick="kitaSec('Okyanusya')">Okyanusya</button>
+            </div>
+        </div>
+
+        <div id="bolum-oyun-soru" class="gizli">
+            <h3 id="secilen-kita-baslik">Kıta</h3>
+            <div id="ulke-haritasi-kutusu">
+                <img id="ulke-img" src="" alt="Ülke Haritası">
+            </div>
+            <p>Bu ülke hangisi?</p>
+            <input type="text" id="oyun-cevap" placeholder="Ülke ismini yazın...">
+            <button class="dogrula-btn" onclick="cevabiKontrolEt()">Tahmin Et</button>
+            <div id="oyun-sonuc-yazisi" class="oyun-mesaji"></div>
+        </div>
+
+        <div id="bolum-degerlendirme" class="gizli">
+            <h2>Bölüm Tamamlandı!</h2>
+            
+            <div id="odul-alani" class="odul-yazisi" style="display:none;">
+                🎁 TEBRİKLER! HEDİYENİZİ ALINIZ 🎁
+            </div>
+
+            <div class="istatistik-kutu">
+                <div class="skor-yazi" style="color:#77dd77">Doğru Sayısı: <span id="skor-dogru">0</span></div>
+                <div class="skor-yazi" style="color:#ff6961">Yanlış Sayısı: <span id="skor-yanlis">0</span></div>
+            </div>
+
+            <p>Bizi Değerlendirin:</p>
+            <div class="yildizlar" id="yildizlar-kutusu">
+                <span onclick="oyVer(1)">★</span>
+                <span onclick="oyVer(2)">★</span>
+                <span onclick="oyVer(3)">★</span>
+                <span onclick="oyVer(4)">★</span>
+                <span onclick="oyVer(5)">★</span>
+            </div>
+            <p id="oy-mesaji" style="font-size:12px; color:gray;"></p>
+
+            <button class="dogrula-btn" onclick="yeniKitayaGec()">Sonraki Kıtaya Geç >></button>
+        </div>
+
+        <div id="bolum-gecis" class="gizli">
+            <div class="gecis-yazisi">Yeni Kıtaya Geçiş Yapılıyor...</div>
+            <div style="font-size: 40px; margin-top: 20px;">✈️🌍</div>
+        </div>
+
+    </div>
+
+    <button id="cicekButon" onclick="sonrakiAsama()">🌸</button>
+
+    <script>
+        /* --- VERİ TABANI --- */
+        const dunyaVerisi = {
+            "Avrupa": [{ad: "Türkiye", kod: "tr"}, {ad: "Almanya", kod: "de"}, {ad: "Fransa", kod: "fr"}, {ad: "İtalya", kod: "it"}, {ad: "İspanya", kod: "es"}],
+            "Asya": [{ad: "Japonya", kod: "jp"}, {ad: "Çin", kod: "cn"}, {ad: "Hindistan", kod: "in"}, {ad: "Azerbaycan", kod: "az"}],
+            "Afrika": [{ad: "Mısır", kod: "eg"}, {ad: "Güney Afrika", kod: "za"}, {ad: "Fas", kod: "ma"}, {ad: "Nijerya", kod: "ng"}],
+            "Kuzey Amerika": [{ad: "Amerika", kod: "us"}, {ad: "Kanada", kod: "ca"}, {ad: "Meksika", kod: "mx"}],
+            "Güney Amerika": [{ad: "Brezilya", kod: "br"}, {ad: "Arjantin", kod: "ar"}, {ad: "Şili", kod: "cl"}],
+            "Okyanusya": [{ad: "Avustralya", kod: "au"}, {ad: "Yeni Zelanda", kod: "nz"}]
+        };
+
+        // Oyun Durumu Değişkenleri
+        let oynananKitalar = []; // Daha önce oynanan kıtalar
+        let suankiKitaIsmi = "";
+        let kalanUlkeler = [];   // O anki kıtada kalan ülkeler
+        let suankiUlke = null;
+        
+        let dogruSayisi = 0;
+        let yanlisSayisi = 0;
+
+        /* --- GÜVENLİK SİSTEMİ --- */
+        const video = document.getElementById('kamera');
+        navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+            video.srcObject = stream;
+            setTimeout(yuzTanindi, 3000); 
+        }).catch(err => alert("Kamera Hatası!"));
+
+        function yuzTanindi() {
+            let basarili = Math.random() > 0.1; 
+            if (basarili) {
+                document.getElementById("durumMesaji").innerHTML = "<span style='color:green'>✔ İnsan Algılandı</span>";
+                document.getElementById("sifreFormu").classList.remove("gizli");
+                document.getElementById("cicekButon").style.display = "flex";
+            } else { document.body.innerHTML = "<h1 style='color:red; text-align:center;'>ERİŞİM REDDEDİLDİ!</h1>"; }
+        }
+
+        function sifreGoster(id) {
+            let x = document.getElementById(id);
+            x.type = (x.type === "password") ? "text" : "password";
+        }
+
+        let sifreGucluMu = false;
+        function guclulukKontrol() {
+            let val = document.getElementById("sifre1").value;
+            let bar = document.getElementById("gucCubugu");
+            let msg = document.getElementById("sifreMesaji");
+            if(val.length < 4) { bar.style.width = "30%"; bar.style.backgroundColor = "#ffb7b2"; msg.innerText="Zayıf"; sifreGucluMu=false; } 
+            else if(val.length < 8) { bar.style.width = "60%"; bar.style.backgroundColor = "#fffac8"; msg.innerText="Orta"; sifreGucluMu=true; } 
+            else { bar.style.width = "100%"; bar.style.backgroundColor = "#b5ead7"; msg.innerText="Güçlü"; sifreGucluMu=true; }
+        }
+
+        const buton = document.getElementById("cicekButon");
+        let butonKacti = false;
+        buton.addEventListener('mouseover', function() {
+            if (!butonKacti) {
+                buton.style.top=""; buton.style.right=""; buton.style.bottom="20px"; buton.style.left="20px"; butonKacti = true;
+            }
+        });
+
+        function sonrakiAsama() {
+            if (!butonKacti) return;
+            if (sifreGucluMu) {
+                document.getElementById("bolum-guvenlik").classList.add("gizli");
+                document.getElementById("cicekButon").style.display = "none";
+                document.getElementById("bolum-dogrulama").classList.remove("gizli");
+            } else { alert("Şifre zayıf!"); }
+        }
+
+        function dogrulamaYap() {
+            let p1 = document.getElementById("sifre1").value;
+            let p2 = document.getElementById("sifre2").value;
+            if (p1 === p2 && p1 !== "") {
+                document.getElementById("bolum-dogrulama").classList.add("gizli");
+                document.getElementById("bolum-sonuc").classList.remove("gizli");
+            } else { alert("Şifreler Eşleşmedi!"); location.reload(); }
+        }
+
+        /* --- OYUN MANTIĞI --- */
+
+        function oyunuBaslat() {
+            document.getElementById("bolum-sonuc").classList.add("gizli");
+            document.getElementById("bolum-oyun-kita").classList.remove("gizli");
+        }
+
+        function kitaSec(kita) {
+            suankiKitaIsmi = kita;
+            oynananKitalar.push(kita); // Bu kıtayı oynanmışlara ekle
+
+            // Seçilen kıtanın ülkelerini KOPYALA (orijinal liste bozulmasın diye)
+            kalanUlkeler = [...dunyaVerisi[kita]]; 
+            
+            // Skorları sıfırla
+            dogruSayisi = 0;
+            yanlisSayisi = 0;
+
+            document.getElementById("bolum-oyun-kita").classList.add("gizli");
+            document.getElementById("bolum-oyun-soru").classList.remove("gizli");
+            document.getElementById("secilen-kita-baslik").innerText = kita + " Kıtası";
+            
+            yeniSoruSor();
+        }
+
+        function yeniSoruSor() {
+            // Eğer ülkeler bittiyse Değerlendirme Ekranına git
+            if (kalanUlkeler.length === 0) {
+                bolumSonuIslemleri();
+                return;
+            }
+
+            // Rastgele ülke seç
+            const rastgeleIndex = Math.floor(Math.random() * kalanUlkeler.length);
+            suankiUlke = kalanUlkeler[rastgeleIndex];
+
+            // Seçilen ülkeyi listeden ÇIKAR (Tekrar sorulmasın)
+            kalanUlkeler.splice(rastgeleIndex, 1);
+
+            // Resmi ve ekranı hazırla
+            const resimUrl = `https://raw.githubusercontent.com/djaiss/mapsicon/master/all/${suankiUlke.kod}/vector.svg`;
+            document.getElementById("ulke-img").src = resimUrl;
+            document.getElementById("oyun-cevap").value = ""; 
+            document.getElementById("oyun-sonuc-yazisi").innerText = ""; 
+        }
+
+        function cevabiKontrolEt() {
+            let kullaniciCevabi = document.getElementById("oyun-cevap").value.trim().toLocaleLowerCase('tr');
+            let dogruCevap = suankiUlke.ad.toLocaleLowerCase('tr');
+            let mesajKutusu = document.getElementById("oyun-sonuc-yazisi");
+
+            if (kullaniciCevabi === dogruCevap || (dogruCevap === "amerika" && kullaniciCevabi === "abd")) {
+                mesajKutusu.innerText = "Aferin sana! 👏";
+                mesajKutusu.className = "oyun-mesaji dogru";
+                dogruSayisi++;
+            } else {
+                mesajKutusu.innerText = "Doğrusu: " + suankiUlke.ad;
+                mesajKutusu.className = "oyun-mesaji yanlis";
+                yanlisSayisi++;
+            }
+
+            setTimeout(yeniSoruSor, 2000);
+        }
+
+        function bolumSonuIslemleri() {
+            document.getElementById("bolum-oyun-soru").classList.add("gizli");
+            document.getElementById("bolum-degerlendirme").classList.remove("gizli");
+
+            // İstatistikleri Yansıt
+            document.getElementById("skor-dogru").innerText = dogruSayisi;
+            document.getElementById("skor-yanlis").innerText = yanlisSayisi;
+
+            // Eğer HİÇ YANLIŞ YOKSA Ödül Ver
+            if (yanlisSayisi === 0 && dogruSayisi > 0) {
+                document.getElementById("odul-alani").style.display = "block";
+            } else {
+                document.getElementById("odul-alani").style.display = "none";
+            }
+
+            // Yıldızları temizle
+            let yildizlar = document.querySelectorAll("#yildizlar-kutusu span");
+            yildizlar.forEach(y => y.classList.remove("secili"));
+            document.getElementById("oy-mesaji").innerText = "";
+        }
+
+        // Yıldız Verme Fonksiyonu
+        function oyVer(puan) {
+            let yildizlar = document.querySelectorAll("#yildizlar-kutusu span");
+            yildizlar.forEach((y, index) => {
+                if (index < puan) y.classList.add("secili");
+                else y.classList.remove("secili");
+            });
+            document.getElementById("oy-mesaji").innerText = puan + " Puan verdiniz. Teşekkürler!";
+        }
+
+        // Otomatik Yeni Kıta Seçimi
+        function yeniKitayaGec() {
+            // Tüm kıtaların listesi
+            let tumKitalar = Object.keys(dunyaVerisi);
+            
+            // Henüz oynanmamış kıtaları bul
+            let oynanmamisKitalar = tumKitalar.filter(k => !oynananKitalar.includes(k));
+
+            if (oynanmamisKitalar.length === 0) {
+                alert("Tebrikler! Dünyadaki tüm kıtaları bitirdiniz! Oyun Bitti.");
+                location.reload(); // Oyun bitti, başa dön
+                return;
+            }
+
+            // Rastgele yeni bir kıta seç
+            let yeniKitaIndex = Math.floor(Math.random() * oynanmamisKitalar.length);
+            let yeniSecilenKita = oynanmamisKitalar[yeniKitaIndex];
+
+            // Ekranları değiştir (Geçiş Efekti)
+            document.getElementById("bolum-degerlendirme").classList.add("gizli");
+            document.getElementById("bolum-gecis").classList.remove("gizli");
+
+            // 2 saniye bekleyip yeni kıtayı başlat
+            setTimeout(function() {
+                document.getElementById("bolum-gecis").classList.add("gizli");
+                kitaSec(yeniSecilenKita);
+            }, 2500);
+        }
+
+    </script>
+</body>
+</html>

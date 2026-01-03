@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biyometrik Güvenlik Terminali v5.0</title>
+    <style>
+        :root { --neon: #00ff41; --err: #ff3131; --bg: #050505; }
+        body { background: var(--bg); color: var(--neon); font-family: 'Courier New', monospace; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; overflow-x: hidden; }
+        
+        .terminal { width: 800px; border: 2px solid var(--neon); padding: 25px; background: rgba(0, 15, 0, 0.95); box-shadow: 0 0 40px rgba(0, 255, 65, 0.2); position: relative; }
+        
+        /* Görüntü Alanı */
+        .video-wrapper { position: relative; width: 100%; height: 450px; border: 1px solid var(--neon); background: #000; overflow: hidden; }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); filter: sepia(0.5) hue-rotate(80deg) brightness(1.2); }
+        
+        /* Tarama Çizgisi */
+        .laser { position: absolute; width: 100%; height: 4px; background: var(--neon); top: -10px; box-shadow: 0 0 20px var(--neon); display: none; z-index: 10; }
+        .scanning .laser { display: block; animation: scanAnim 4s infinite linear; }
+        @keyframes scanAnim { 0% { top: 0; } 100% { top: 100%; } }
+
+        /* Benzerlik Barı */
+        .meter-container { height: 12px; background: #111; border: 1px solid var(--neon); margin: 20px 0; position: relative; border-radius: 6px; overflow: hidden; }
+        #meter-fill { height: 100%; width: 0%; background: var(--neon); transition: width 0.6s ease; }
+        
+        /* Arayüz Elemanları */
+        .status { text-align: center; background: #001a00; border: 1px solid var(--neon); padding: 10px; margin-bottom: 20px; font-weight: bold; min-height: 24px; }
+        button { width: 100%; padding: 18px; background: var(--neon); color: #000; border: none; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 16px; transition: 0.3s; }
+        button:hover { background: #fff; box-shadow: 0 0 20px #fff; }
+        button:disabled { background: #003300; color: #006600; cursor: wait; }
+
+        /* Oyun Alanı */
+        #game-area { display: none; padding-top: 10px; }
+        input { width: 100%; padding: 15px; background: #000; border: 1px solid var(--neon); color: var(--neon); font-size: 20px; text-align: center; box-sizing: border-box; outline: none; }
+        .rule-box { margin-top: 15px; }
+        .rule { padding: 10px; margin: 5px 0; border: 1px solid #222; font-size: 14px; }
+        .valid { border-color: var(--neon); background: rgba(0, 255, 65, 0.1); }
+        .invalid { border-color: var(--err); color: var(--err); background: rgba(255, 0, 0, 0.1); }
+        
+        canvas { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="terminal">
+    <h2 style="text-align: center; margin-top: 0; letter-spacing: 6px;">BIOMETRIC ACCESS CONTROL</h2>
+    
+    <div class="video-wrapper" id="v-wrap">
+        <video id="webcam" autoplay playsinline></video>
+        <div class="laser"></div>
+    </div>
+
+    <div class="meter-container">
+        <div id="meter-fill"></div>
+    </div>
+
+    <div class="status" id="status-msg">SİSTEM MESAJI: Kamera başlatılıyor...</div>
+
+    <div id="auth-ui">
+        <button id="main-btn" onclick="startBiometricTask()">YÜZÜ SİSTEME KAYDET</button>
+    </div>
+
+    <div id="game-area">
+        <h3 style="text-align:center; color:white;">ŞİFRE TERMİNALİ YETKİLENDİRİLDİ</h3>
+        <input type="text" id="password-input" placeholder="Şifrenizi oluşturun...">
+        <div class="rule-box" id="rules"></div>
+    </div>
+</div>
+
+<canvas id="analysis-canvas"></canvas>
+
+<script>
+    const video = document.getElementById('webcam');
+    const status = document.getElementById('status-msg');
+    const btn = document.getElementById('main-btn');
+    const meter = document.getElementById('meter-fill');
+    const canvas = document.getElementById('analysis-canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+    let savedSignature = null;
+    let currentStep = "REGISTER";
+
+    // 1. Gelişmiş Kamera Başlatma (Siyah Ekran Çözümü)
+    async function initCamera() {
+        const qualities = [
+            { video: { width: 1920, height: 1080 } },
+            { video: { width: 1280, height: 720 } },
+            { video: true }
+        ];
+
+        for (let q of qualities) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(q);
+                video.srcObject = stream;
+                video.onloadedmetadata = () => video.play();
+                status.textContent = "SİSTEM MESAJI: Kamera Aktif. Profil kaydı bekleniyor.";
+                return;
+            } catch (e) { console.warn("Mod denenemedi, alt moda geçiliyor..."); }
+        }
+        status.textContent = "HATA: Kamera bulunamadı! Lütfen izinleri kontrol edin.";
+    }
+
+    // 2. Yüz İmzası Alma (10x10 Grid Analizi)
+    function captureFaceSignature() {
+        canvas.width = 10;
+        canvas.height = 10;
+        ctx.drawImage(video, 0, 0, 10, 10);
+        const data = ctx.getImageData(0, 0, 10, 10).data;
+        let signature = [];
+        for (let i = 0; i < data.length; i += 4) {
+            signature.push((data[i] + data[i+1] + data[i+2]) / 3);
+        }
+        return signature;
+    }
+
+    // 3. Ana İşlem Döngüsü (4 Saniye Tarama)
+    async function startBiometricTask() {
+        btn.disabled = true;
+        document.getElementById('v-wrap').classList.add('scanning');
+        
+        let timer = 4;
+        const countdown = setInterval(() => {
+            status.textContent = `BİYOMETRİK VERİ ANALİZ EDİLİYOR: ${timer}s`;
+            timer--;
+            if (timer < 0) clearInterval(countdown);
+        }, 1000);
+
+        await new Promise(r => setTimeout(r, 4500));
+        document.getElementById('v-wrap').classList.remove('scanning');
+
+        if (currentStep === "REGISTER") {
+            savedSignature = captureFaceSignature();
+            status.innerHTML = "SİSTEM MESAJI: <span style='color:white'>PROFİL KAYDEDİLDİ.</span>";
+            meter.style.width = "100%";
+            setTimeout(() => {
+                currentStep = "VERIFY";
+                btn.textContent = "KİMLİĞİ DOĞRULA VE GİRİŞ YAP";
+                btn.disabled = false;
+                status.textContent = "SİSTEM MESAJI: Giriş için tekrar tarama yapın.";
+                meter.style.width = "0%";
+            }, 1500);
+        } else {
+            const currentData = captureFaceSignature();
+            let totalDiff = 0;
+            for (let i = 0; i < savedSignature.length; i++) {
+                totalDiff += Math.abs(savedSignature[i] - currentData[i]);
+            }
+
+            // Benzerlik hesaplama (%75-80 toleranslı)
+            let avgDiff = totalDiff / 100;
+            let similarity = Math.max(0, 100 - (avgDiff / 0.75)); 
+            
+            meter.style.width = similarity + "%";
+
+            if (similarity >= 70) {
+                status.innerHTML = `SİSTEM MESAJI: <span style='color:white'>ERİŞİM ONAYLANDI (%${similarity.toFixed(1)})</span>`;
+                setTimeout(unlockSystem, 1000);
+            } else {
+                status.innerHTML = `SİSTEM MESAJI: <span style='color:red'>ERİŞİM REDDEDİLDİ (%${similarity.toFixed(1)})</span>`;
+                btn.disabled = false;
+            }
+        }
+    }
+
+    function unlockSystem() {
+        document.getElementById('auth-ui').style.display = 'none';
+        document.getElementById('v-wrap').style.display = 'none';
+        document.getElementById('game-area').style.display = 'block';
+        status.textContent = "SİSTEM DURUMU: ŞİFRE OLUŞTURMA MODU";
+    }
+
+    // 4. Şifre Kuralları (The Password Game Mantığı)
+    document.getElementById('password-input').oninput = function() {
+        const v = this.value;
+        const sum = (v.match(/\d/g) || []).reduce((a, b) => a + Number(b), 0);
+        
+        const rules = [
+            { text: "Şifre en az 8 karakter olmalı.", check: v.length >= 8 },
+            { text: "Şifre bir büyük harf içermeli.", check: /[A-Z]/.test(v) },
+            { text: "Şifre bir rakam içermeli.", check: /[0-9]/.test(v) },
+            { text: "Şifredeki rakamların toplamı tam 25 olmalı.", check: sum === 25 }
+        ];
+
+        document.getElementById('rules').innerHTML = rules.map(r => `
+            <div class="rule ${r.check ? 'valid' : 'invalid'}">
+                ${r.check ? '✅' : '❌'} ${r.text} ${r.text.includes('toplamı') ? `(Şu an: ${sum})` : ''}
+            </div>
+        `).join('');
+    };
+
+    initCamera();
+</script>
+</body>
+</html>

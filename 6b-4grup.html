@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>ŞİFREBOT - Sınırsız Karakter Erişimi</title>
+    <style>
+        :root { --neon: #00ff00; --bg: #050505; --lost: #ff0000; }
+        body { margin: 0; background: var(--bg); color: white; font-family: 'Courier New', monospace; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .screen { display: none; flex-direction: column; align-items: center; width: 100%; height: 100vh; justify-content: center; position: absolute; text-align: center; }
+        #startScreen { display: flex; }
+        #videoContainer { position: relative; width: 400px; height: 300px; border: 4px solid var(--neon); border-radius: 15px; overflow: hidden; background: #000; }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        #scanLine { position: absolute; width: 100%; height: 5px; background: var(--neon); top: 0; animation: scanAnim 1.5s infinite linear; }
+        @keyframes scanAnim { 0% { top: 0; } 100% { top: 100%; } }
+
+        /* ZAFER EKRANI (TAM YEŞİL) */
+        #winScreen { background: #00ff00; color: #000; z-index: 9999; }
+        .win-title { font-size: 5em; font-weight: 900; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+        .ui-box { background: #111; padding: 25px; border: 2px solid var(--neon); border-radius: 10px; width: 350px; }
+        input { padding: 12px; width: 85%; background: #000; color: var(--neon); border: 1px solid var(--neon); margin: 15px 0; text-align: center; font-size: 1.2em; border-radius: 5px; }
+        button { padding: 15px 40px; background: var(--neon); border: none; font-weight: bold; cursor: pointer; text-transform: uppercase; border-radius: 8px; transition: 0.3s; }
+        button:hover { background: white; color: black; }
+
+        .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 20px; }
+        .card { border: 2px solid #333; padding: 20px; background: #111; cursor: pointer; border-radius: 8px; font-weight: bold; }
+        .locked { opacity: 0.2; cursor: not-allowed; }
+
+        canvas { background: #000; border: 5px solid #222; box-shadow: 0 0 20px rgba(0,255,0,0.2); }
+    </style>
+</head>
+<body>
+
+    <div id="startScreen" class="screen">
+        <h1 style="color:var(--neon); font-size: 3em;">MATEMATİKSEL ERİŞİM</h1>
+        <button onclick="openCamera()">SİSTEMİ BAŞLAT</button>
+    </div>
+
+    <div id="cameraScreen" class="screen">
+        <h2 style="color:var(--neon)">BİYOMETRİK DOĞRULAMA...</h2>
+        <div id="videoContainer">
+            <video id="webcam" autoplay playsinline></video>
+            <div id="scanLine"></div>
+        </div>
+    </div>
+
+    <div id="passwordScreen" class="screen">
+        <div class="ui-box">
+            <h2 style="color:var(--neon)">ŞİFRE GİRİŞİ</h2>
+            <p style="font-size: 0.8em; color: orange;">1 Karakter (+,-,*,/,@ vb.) | 3 Rakam | 5 Harf</p>
+            <input type="text" id="passInput" placeholder="Şifrenizi Yazın">
+            <button onclick="checkPassword()">SİSTEME SIZ</button>
+        </div>
+    </div>
+
+    <div id="levelScreen" class="screen">
+        <h1 id="menuTitle" style="color:var(--neon)">ADALAR</h1>
+        <div id="list" class="grid"></div>
+        <button id="backBtn" style="display:none; background:#333;" onclick="showIslands()">GERİ</button>
+    </div>
+
+    <div id="gameScreen" class="screen">
+        <div id="lvlInfo" style="color:var(--neon); font-size: 1.2em; margin-bottom: 5px;"></div>
+        <canvas id="mazeCanvas" width="580" height="580"></canvas>
+    </div>
+
+    <div id="winScreen" class="screen">
+        <div class="win-title">ERİŞİM ONAYLANDI</div>
+        <h2>VERİLER ELE GEÇİRİLDİ</h2>
+        <button onclick="goBackToMenu()" style="background:black; color:lime; padding: 20px 40px;">BİR SONRAKİ HEDEF</button>
+    </div>
+
+    <div id="loseScreen" class="screen">
+        <h1 style="color:var(--lost); font-size: 3em;">ENGELLEDİNİZ!</h1>
+        <button onclick="retryLevel()">TEKRAR DENE</button>
+    </div>
+
+    <script>
+        let progress = JSON.parse(localStorage.getItem('bot_v10_save')) || { island: 0, level: 0 };
+        let currentIsland = 0, currentLevelIndex = 0, gameRunning = false;
+
+        function changeScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
+            document.getElementById(id).style.display = 'flex';
+        }
+
+        async function openCamera() {
+            changeScreen('cameraScreen');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                document.getElementById('webcam').srcObject = stream;
+                setTimeout(() => {
+                    stream.getTracks().forEach(t => t.stop());
+                    changeScreen('passwordScreen');
+                }, 3000);
+            } catch (e) { changeScreen('passwordScreen'); }
+        }
+
+        function checkPassword() {
+            const val = document.getElementById('passInput').value;
+            // GÜNCELLENMİŞ ÖZEL KARAKTER LİSTESİ (Matematiksel semboller dahil)
+            const specialChars = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(val);
+            const nums = (val.match(/\d/g) || []).length >= 3;
+            const letters = (val.match(/[a-zA-Z]/g) || []).length >= 5;
+
+            if(specialChars && nums && letters) {
+                showIslands();
+                changeScreen('levelScreen');
+            } else { 
+                alert("Şifre Şartı: \n1 Özel Karakter (Matematiksel olabilir) \n3 Rakam \n5 Harf"); 
+            }
+        }
+
+        function showIslands() {
+            document.getElementById('backBtn').style.display = 'none';
+            const list = document.getElementById('list');
+            list.innerHTML = '';
+            for(let i=0; i<5; i++) {
+                const card = document.createElement('div');
+                card.className = `card ${i > progress.island ? 'locked' : ''}`;
+                card.innerHTML = `ADA ${i+1}`;
+                if(i <= progress.island) card.onclick = () => showLevels(i);
+                list.appendChild(card);
+            }
+        }
+
+        function showLevels(islandIdx) {
+            currentIsland = islandIdx;
+            document.getElementById('backBtn').style.display = 'block';
+            const list = document.getElementById('list');
+            list.innerHTML = '';
+            for(let i=0; i<5; i++) {
+                const card = document.createElement('div');
+                const isLocked = (islandIdx == progress.island && i > progress.level) || (islandIdx > progress.island);
+                card.className = `card ${isLocked ? 'locked' : ''}`;
+                card.innerHTML = `S${i+1}`;
+                if(!isLocked) card.onclick = () => startTheGame(i);
+                list.appendChild(card);
+            }
+        }
+
+        const canvas = document.getElementById('mazeCanvas');
+        const ctx = canvas.getContext('2d');
+        let maze, player, goal, enemies, tileSize;
+
+        function startTheGame(lvlIdx) {
+            currentLevelIndex = lvlIdx;
+            changeScreen('gameScreen');
+            document.getElementById('lvlInfo').innerText = `BÖLGE: ${currentIsland+1}-${lvlIdx+1}`;
+            
+            const size = 11 + lvlIdx; 
+            tileSize = 580 / size;
+            maze = Array(size).fill().map(() => Array(size).fill(1));
+            
+            function generate(x, y) {
+                maze[y][x] = 0;
+                const dirs = [[0,2],[0,-2],[2,0],[-2,0]].sort(() => Math.random() - 0.5);
+                for(let [dx, dy] of dirs) {
+                    let nx = x + dx, ny = y + dy;
+                    if(nx >= 0 && nx < size && ny >= 0 && ny < size && maze[ny][nx] == 1) {
+                        maze[y + dy/2][x + dx/2] = 0;
+                        generate(nx, ny);
+                    }
+                }
+            }
+            generate(0, 0);
+
+            // GARANTİLENMİŞ YEŞİL ALAN YOLU
+            goal = { x: size - 1, y: size - 1 };
+            maze[goal.y][goal.x] = 0;
+            maze[goal.y - 1][goal.x] = 0;
+            maze[goal.y][goal.x - 1] = 0;
+
+            player = { x: 0, y: 0 };
+            enemies = [];
+            for(let i=0; i < 2 + currentIsland; i++) {
+                enemies.push({ x: 300, y: 300, speed: 0.4 + (lvlIdx * 0.1), char: '%' });
+            }
+
+            gameRunning = true;
+            gameLoop();
+
+            window.onkeydown = (e) => {
+                if(!gameRunning) return;
+                let nx = player.x, ny = player.y;
+                if(e.key == "ArrowUp") ny--;
+                if(e.key == "ArrowDown") ny++;
+                if(e.key == "ArrowLeft") nx--;
+                if(e.key == "ArrowRight") nx++;
+                
+                if(nx >= 0 && nx < size && ny >= 0 && ny < size && maze[ny][nx] == 0) {
+                    player.x = nx; player.y = ny;
+                    if(player.x == goal.x && player.y == goal.y) {
+                        gameRunning = false;
+                        triggerWin();
+                    }
+                }
+            };
+        }
+
+        function gameLoop() {
+            if(!gameRunning) return;
+            ctx.fillStyle = "#000"; ctx.fillRect(0,0,580,580);
+            for(let y=0; y<maze.length; y++) {
+                for(let x=0; x<maze.length; x++) {
+                    if(maze[y][x] == 1) { ctx.fillStyle = "#222"; ctx.fillRect(x*tileSize, y*tileSize, tileSize, tileSize); }
+                }
+            }
+            ctx.fillStyle = "#0f0"; ctx.fillRect(goal.x*tileSize + 2, goal.y*tileSize + 2, tileSize-4, tileSize-4);
+            ctx.fillStyle = "yellow"; ctx.beginPath();
+            ctx.arc(player.x*tileSize+tileSize/2, player.y*tileSize+tileSize/2, tileSize/3, 0, 7); ctx.fill();
+
+            ctx.fillStyle = "red"; ctx.font = `bold ${tileSize*0.6}px Arial`;
+            enemies.forEach(en => {
+                let dx = (player.x*tileSize) - en.x, dy = (player.y*tileSize) - en.y;
+                let dist = Math.hypot(dx, dy);
+                en.x += (dx/dist)*en.speed; en.y += (dy/dist)*en.speed;
+                ctx.fillText(en.char, en.x, en.y);
+                if(dist < tileSize * 0.4) { gameRunning = false; changeScreen('loseScreen'); }
+            });
+            requestAnimationFrame(gameLoop);
+        }
+
+        function triggerWin() {
+            if(currentLevelIndex == progress.level && currentIsland == progress.island) {
+                if(progress.level < 4) progress.level++;
+                else { progress.island++; progress.level = 0; }
+                localStorage.setItem('bot_v10_save', JSON.stringify(progress));
+            }
+            changeScreen('winScreen');
+        }
+
+        function goBackToMenu() { showLevels(currentIsland); changeScreen('levelScreen'); }
+        function retryLevel() { startTheGame(currentLevelIndex); }
+    </script>
+</body>
+</html>

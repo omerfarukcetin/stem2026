@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Night Security: Dark Shift</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Special+Elite&family=Share+Tech+Mono&display=swap');
+
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Share Tech Mono', monospace; user-select: none; }
+
+        /* --- BİYOMETRİK GİRİŞ EKRANI --- */
+        #bio-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            color: #0f0;
+        }
+        #cam-container {
+            position: relative; width: 640px; height: 480px; border: 2px solid #333;
+            background: #111; box-shadow: 0 0 20px rgba(0, 255, 0, 0.1);
+            overflow: hidden; display: none;
+        }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); filter: grayscale(100%) contrast(1.5) brightness(0.6); } /* Kamera görüntüsü de karanlık */
+        
+        .scan-line {
+            position: absolute; top: 0; left: 0; width: 100%; height: 4px;
+            background: rgba(0, 255, 0, 0.8); box-shadow: 0 0 10px #0f0;
+            animation: scanAnim 2s infinite linear; display: none;
+        }
+        @keyframes scanAnim { 0% { top: 0%; opacity: 0; } 50% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
+        
+        .login-btn {
+            padding: 15px 40px; font-size: 20px; cursor: pointer; margin-top: 20px;
+            background: transparent; color: #0f0; border: 1px solid #0f0; 
+            font-family: 'Share Tech Mono', monospace; transition: 0.3s;
+        }
+        .login-btn:hover { background: rgba(0, 255, 0, 0.1); box-shadow: 0 0 15px #0f0; }
+
+        /* --- OYUN ARAYÜZÜ --- */
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; display: flex; flex-direction: column; justify-content: space-between;
+            background: radial-gradient(circle at center, transparent 50%, #000000 100%); /* Köşeler daha karanlık */
+        }
+        #password-note, #tenant-list, #control-panel, #dialogue-box { pointer-events: auto; }
+        
+        #password-note {
+            position: absolute; top: 20px; left: 240px;
+            background: #e6e1c5; color: #111; padding: 15px; width: 120px; height: 120px;
+            font-family: 'Special Elite', cursive; transform: rotate(3deg);
+            box-shadow: 0 0 5px rgba(0,0,0,0.8); text-align: center; font-size: 18px;
+            border: 1px solid #999; display: flex; flex-direction: column; justify-content: center;
+        }
+        .pass-text { font-weight: bold; font-size: 22px; color: #b71c1c; margin-top: 10px; display: block;}
+
+        #tenant-list {
+            position: absolute; top: 20px; left: 20px;
+            background: #dddddd; color: #111; padding: 15px; width: 180px;
+            font-family: 'Special Elite', cursive; transform: rotate(-2deg);
+            box-shadow: 0 0 10px rgba(0,0,0,0.8); font-size: 13px; border: 1px solid #999;
+        }
+        .list-item { margin-bottom: 4px; border-bottom: 1px dashed #777; padding-bottom: 2px; }
+
+        #control-panel {
+            position: absolute; bottom: 30px; right: 30px;
+            display: flex; flex-direction: column; gap: 12px; width: 240px;
+            background: rgba(10, 10, 15, 0.95); padding: 15px; border-radius: 4px;
+            border: 1px solid rgba(100,100,100,0.3);
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+        #intercom-screen {
+            background: #111; border: 1px solid #333; height: 50px;
+            display: flex; align-items: center; justify-content: center;
+            color: #29b6f6; font-size: 16px; text-shadow: 0 0 5px #29b6f6;
+            font-weight: bold; letter-spacing: 2px;
+        }
+        .btn {
+            padding: 14px; font-size: 18px; font-family: 'Share Tech Mono', monospace;
+            cursor: pointer; border: 1px solid #444; color: #ccc;
+            background: linear-gradient(180deg, #2a2a2a, #1a1a1a);
+            border-radius: 2px; display: flex; justify-content: space-between;
+        }
+        .btn:hover { background: #333; color: #fff; border-color: #666; }
+
+        #dialogue-box {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            width: 60%; background: rgba(5, 5, 10, 0.95);
+            border-top: 2px solid #555; padding: 25px;
+            color: #cfd8dc; font-size: 20px; min-height: 70px;
+            display: flex; align-items: center; justify-content: center;
+            text-align: center; border-radius: 4px;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.9);
+        }
+
+        /* --- SAYAÇ & KEYPAD --- */
+        #counter-display {
+            position: absolute; top: 20px; right: 20px;
+            color: #69f0ae; font-size: 20px; letter-spacing: 1px;
+            background: rgba(0,0,0,0.8); padding: 8px 15px; border: 1px solid #333;
+        }
+
+        #keypad-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.95); z-index: 800;
+            display: none; justify-content: center; align-items: center; flex-direction: column;
+        }
+        #keypad-container {
+            background: #111; padding: 30px; border: 1px solid #444; 
+            box-shadow: 0 0 50px rgba(0,0,0,1); width: 300px;
+        }
+        #keypad-screen {
+            background: #000; color: #0f0; font-size: 32px; height: 60px;
+            margin-bottom: 20px; display: flex; align-items: center; justify-content: center;
+            border: 1px solid #333; letter-spacing: 10px; text-shadow: 0 0 10px #0f0;
+        }
+        .key-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .key-btn {
+            background: #222; color: #aaa; padding: 20px; font-size: 24px; border: 1px solid #333;
+            cursor: pointer; font-family: 'Share Tech Mono', monospace;
+        }
+        .key-btn:active { background: #444; color: #fff; }
+        .key-submit { grid-column: span 3; background: #1b5e20; color: #fff; border:none; margin-top: 10px; }
+        .key-clear { background: #b71c1c; color: #fff; border:none;}
+
+    </style>
+</head>
+<body>
+
+    <div id="bio-screen">
+        <h1 style="margin-bottom: 5px; color:#ccc;">GÜVENLİK TERMİNALİ</h1>
+        <p style="color:#555; margin-bottom: 30px;">GECE MODU AKTİF</p>
+        <div id="cam-container">
+            <video id="webcam" autoplay playsinline></video>
+            <div class="scan-line" id="scan-line"></div>
+        </div>
+        <div id="scan-status" style="margin-top:20px; font-size:16px; color:#777;">SİSTEM BAĞLANTISI BEKLENİYOR...</div>
+        <button id="start-cam-btn" class="login-btn" onclick="initCamera()">TERMİNALİ AÇ</button>
+    </div>
+
+    <div id="ui-layer" style="display:none;">
+        <div id="counter-display">GİRİŞ: 0/5</div>
+
+        <div id="password-note">
+            <small>GÜNLÜK ŞİFRE:</small>
+            <span class="pass-text" id="daily-pass-display">???</span>
+        </div>
+        <div id="tenant-list">
+            <h3 style="border-bottom:2px solid #000; text-align:center; margin-bottom:5px;">LİSTE</h3>
+            <div id="list-content"></div>
+        </div>
+        <div id="control-panel">
+            <div id="intercom-screen">BEKLEMEDE</div>
+            <button class="btn" onclick="callApartment()">📞 DAİREYİ SOR</button>
+            <button class="btn" style="border-left: 4px solid #69f0ae" onclick="decide(true)">🔓 KAPIYI AÇ</button>
+            <button class="btn" style="border-left: 4px solid #ff8a80" onclick="decide(false)">🔒 KİLİTLE</button>
+        </div>
+        <div id="dialogue-box">
+            <span id="dialogue-text">Vardiya başladı. Hava zifiri karanlık.</span>
+        </div>
+    </div>
+
+    <div id="keypad-layer">
+        <h2 style="color:#eee; margin-bottom:20px;">VARDİYA RAPORU</h2>
+        <div style="color:#888; margin-bottom:20px; width:300px; text-align:center; font-size:14px;">
+            Gelen ziyaretçilerin verdiği numaraları girin:
+        </div>
+        <div id="keypad-container">
+            <div id="keypad-screen"></div>
+            <div class="key-grid">
+                <button class="key-btn" onclick="pressKey(1)">1</button>
+                <button class="key-btn" onclick="pressKey(2)">2</button>
+                <button class="key-btn" onclick="pressKey(3)">3</button>
+                <button class="key-btn" onclick="pressKey(4)">4</button>
+                <button class="key-btn" onclick="pressKey(5)">5</button>
+                <button class="key-btn" onclick="pressKey(6)">6</button>
+                <button class="key-btn" onclick="pressKey(7)">7</button>
+                <button class="key-btn" onclick="pressKey(8)">8</button>
+                <button class="key-btn" onclick="pressKey(9)">9</button>
+                <button class="key-btn key-clear" onclick="clearKey()">SIL</button>
+                <button class="key-btn" onclick="pressKey(0)">0</button>
+                <button class="key-btn key-submit" onclick="submitCode()">GÖNDER</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="importmap">
+        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- DEĞİŞKENLER ---
+        const tenants = [
+            { apt: 1, name: "Ali Y." }, { apt: 3, name: "Ayşe K." }, { apt: 5, name: "Dr. Mehmet" },
+            { apt: 8, name: "Selin D." }, { apt: 12, name: "Kemal B." }, { apt: 15, name: "Zeynep H." }
+        ];
+        const passwords = ["GÖLGE", "GECE", "SİS", "NÖBET", "KAPLAN"];
+        const names = ["Ahmet", "Burcu", "Can", "Deniz", "Kurye", "Tesisatçı"];
+        
+        let dailyPassword = "";
+        let currentVisitor = null;
+        let isCalling = false;
+        let gameState = "IDLE"; 
+        
+        let collectedCodes = []; 
+        let admittedCount = 0;   
+        let inputCode = "";      
+        const TARGET_ADMIT = 5;  
+
+        let scene, camera, renderer, visitorGroup, rainSystem;
+        const visitorParts = { leftLeg: null, rightLeg: null, leftArm: null, rightArm: null };
+
+        // --- KAMERA (GİRİŞ) ---
+        window.initCamera = async function() {
+            const statusEl = document.getElementById('scan-status');
+            const btn = document.getElementById('start-cam-btn');
+            const camContainer = document.getElementById('cam-container');
+            const video = document.getElementById('webcam');
+            
+            btn.style.display = 'none';
+            statusEl.innerText = "KAMERA AÇILIYOR...";
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                camContainer.style.display = 'block'; document.getElementById('scan-line').style.display = 'block';
+                statusEl.innerText = "YÜZ TARANIYOR...";
+                
+                setTimeout(() => { statusEl.innerText = "KİMLİK DOĞRULANDI"; statusEl.style.color = "#0f0"; }, 2500);
+                setTimeout(() => { 
+                    stream.getTracks().forEach(track => track.stop());
+                    document.getElementById('bio-screen').style.display = 'none';
+                    startGame();
+                }, 4000);
+            } catch(e) {
+                statusEl.innerText = "KAMERA HATASI. MANUEL GİRİŞ.";
+                setTimeout(startGame, 1000);
+            }
+        };
+
+        // --- OYUN BAŞLATMA ---
+        window.startGame = function() {
+            document.getElementById('bio-screen').style.display = 'none';
+            document.getElementById('ui-layer').style.display = 'flex';
+            
+            dailyPassword = passwords[Math.floor(Math.random() * passwords.length)];
+            document.getElementById('daily-pass-display').innerText = dailyPassword;
+            
+            initList(); init3D(); animate();
+            setTimeout(spawnVisitor, 4000);
+        };
+
+        function initList() {
+            const listDiv = document.getElementById('list-content');
+            tenants.forEach(t => listDiv.innerHTML += `<div class="list-item">${t.apt}: ${t.name}</div>`);
+        }
+
+        // --- OYUN MANTIĞI ---
+        window.spawnVisitor = function() {
+            if(gameState !== "IDLE") return;
+            
+            const r = Math.random();
+            const targetApt = Math.floor(Math.random() * 15) + 1;
+            const listMatch = tenants.find(t => t.apt === targetApt);
+            let visitorName = names[Math.floor(Math.random() * names.length)];
+            let dialogue = "", residentResponse = "", isResident = false;
+
+            if (r < 0.3) {
+                if(listMatch) { visitorName = listMatch.name; isResident = true; dialogue = `Ben ${visitorName}, No.${targetApt}.`; residentResponse = "Evet benim."; } 
+                else { visitorName = "Ahmet"; dialogue = `Merhaba, ${targetApt} numaraya geldim.`; residentResponse = "Tanımıyorum."; }
+            } else if (r < 0.7) {
+                if (Math.random() > 0.4) { dialogue = `Kargo ${targetApt}. Kod: ${dailyPassword}.`; residentResponse = "Gelsin."; } 
+                else { dialogue = `Paket var ${targetApt}. Şifre bilmiyorum.`; residentResponse = "Şifresiz alma."; }
+            } else { dialogue = "Kapıyı aç hemen!"; residentResponse = "Sakın açma!"; }
+
+            currentVisitor = { 
+                name: visitorName, apt: targetApt, dialogue: dialogue, residentResponse: residentResponse, 
+                shouldEnter: (isResident && listMatch) || dialogue.includes(dailyPassword) 
+            };
+
+            createRealistVisitor();
+            gameState = "APPROACHING";
+            setText("Karanlığın içinden biri geliyor...");
+        }
+
+        window.decide = function(allow) {
+            if(gameState !== "TALKING" && gameState !== "CALLED") return;
+            
+            const isCorrect = (allow === currentVisitor.shouldEnter);
+            
+            if(allow) {
+                playSound('buzz_open');
+                const secretNum = Math.floor(Math.random() * 10);
+                collectedCodes.push(secretNum);
+                admittedCount++;
+                updateCounter();
+                
+                if(isCorrect) {
+                    setText(`Geçti. Elinize "${secretNum}" yazan kağıt sıkıştırdı.`);
+                    document.getElementById('dialogue-text').style.color = "#69f0ae";
+                } else {
+                    setText(`HATA! Yanlış kişi. "${secretNum}" dedi ve gitti.`);
+                    document.getElementById('dialogue-text').style.color = "#ffb74d";
+                }
+            } else {
+                playSound('buzz_deny');
+                setText("Reddedildi. Karanlığa geri dönüyor.");
+                document.getElementById('dialogue-text').style.color = "#ef5350";
+            }
+
+            gameState = "LEAVING";
+            
+            setTimeout(() => {
+                scene.remove(visitorGroup);
+                gameState = "IDLE";
+                currentVisitor = null;
+                document.getElementById('intercom-screen').innerText = "BEKLEMEDE";
+                document.getElementById('intercom-screen').style.color = "#29b6f6";
+                document.getElementById('dialogue-text').style.color = "#cfd8dc";
+
+                if(admittedCount >= TARGET_ADMIT) {
+                    showKeypad();
+                } else {
+                    setText("Etraf sessiz...");
+                    setTimeout(spawnVisitor, 3000);
+                }
+            }, 3500);
+        };
+
+        function updateCounter() {
+            document.getElementById('counter-display').innerText = `GİRİŞ: ${admittedCount}/${TARGET_ADMIT}`;
+        }
+
+        window.callApartment = function() {
+            if(gameState !== "TALKING" || isCalling) return;
+            isCalling = true; gameState = "CALLED";
+            const s = document.getElementById('intercom-screen');
+            s.innerText = "ARANIYOR..."; s.style.color = "#ffeb3b"; playSound('phone_ring');
+            setTimeout(() => { s.innerText = "BAĞLANDI"; s.style.color = "#69f0ae"; setText(`DAİRE: "${currentVisitor.residentResponse}"`); isCalling = false; }, 2500);
+        };
+
+        // --- KEYPAD İŞLEMLERİ ---
+        window.showKeypad = function() {
+            document.getElementById('ui-layer').style.filter = "blur(8px)"; 
+            document.getElementById('keypad-layer').style.display = 'flex';
+            playSound('phone_dial');
+        }
+
+        window.pressKey = function(num) {
+            if(inputCode.length < 10) { inputCode += num; updateKeypadScreen(); playSound('beep'); }
+        }
+        window.clearKey = function() { inputCode = ""; updateKeypadScreen(); playSound('beep'); }
+        function updateKeypadScreen() { document.getElementById('keypad-screen').innerText = inputCode; }
+
+        window.submitCode = function() {
+            const correctSequence = collectedCodes.join("");
+            const screen = document.getElementById('keypad-screen');
+            
+            if(inputCode === correctSequence) {
+                screen.style.color = "#69f0ae"; screen.innerText = "ONAYLANDI"; playSound('success');
+                setTimeout(() => { alert("VARDİYA TAMAMLANDI.\nGüvenli çıkış yapılıyor."); location.reload(); }, 1500);
+            } else {
+                screen.style.color = "red"; screen.innerText = "HATALI KOD"; playSound('buzz_deny');
+                setTimeout(() => { inputCode = ""; screen.style.color = "#0f0"; updateKeypadScreen(); }, 1500);
+            }
+        }
+
+        // --- 3D SAHNE & KARAKTER (KARANLIK MOD) ---
+        function init3D() {
+            scene = new THREE.Scene();
+            // 1. Zifiri karanlık arka plan
+            const darkNight = 0x050510; 
+            scene.background = new THREE.Color(darkNight); 
+            // 2. Çok yoğun sis (Siyah) - Görüş mesafesini sınırlar
+            scene.fog = new THREE.FogExp2(darkNight, 0.035);
+
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 100);
+            camera.position.set(0, 1.6, 3.0);
+            
+            renderer = new THREE.WebGLRenderer({antialias:true});
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true; 
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            // Pozlamayı düşürerek genel karanlığı sağla
+            renderer.toneMapping = THREE.ReinhardToneMapping;
+            renderer.toneMappingExposure = 1.0; 
+            document.body.appendChild(renderer.domElement);
+
+            // ZEMİN (Koyu asfalt)
+            const floorMat = new THREE.MeshStandardMaterial({color:0x1a1a1a, roughness:0.8, metalness:0.2});
+            const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 100), floorMat);
+            floor.rotation.x = -Math.PI/2; floor.receiveShadow=true; scene.add(floor);
+            
+            // MASA (Ahşap)
+            const desk = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.15, 1.8), new THREE.MeshStandardMaterial({color:0x5d4037}));
+            desk.position.set(0, 1.1, 2.0); desk.castShadow=true; desk.receiveShadow=true; scene.add(desk);
+
+            // --- IŞIKLANDIRMA (ÖNEMLİ DEĞİŞİKLİK) ---
+            
+            // 1. Ortam Işığı: ÇOK DÜŞÜK (Neredeyse yok)
+            const hemiLight = new THREE.HemisphereLight(0x222233, 0x000000, 0.2); 
+            scene.add(hemiLight);
+
+            // 2. Masa Lambası: Oyuncunun güvenli alanı (Sarı ve sıcak)
+            const lamp = new THREE.PointLight(0xffb74d, 2, 8); 
+            lamp.position.set(1.5, 1.8, 2.0); 
+            lamp.castShadow=true; 
+            scene.add(lamp);
+
+            // 3. Sokak Lambası: Ziyaretçiyi aydınlatan tek şey (Spot)
+            // Açısı daraltıldı, sadece kapı önünü aydınlatıyor.
+            const spot = new THREE.SpotLight(0xffffff, 40); 
+            spot.position.set(-3, 8, 2); 
+            spot.target.position.set(0,0,-2); 
+            spot.angle = Math.PI / 8; // Dar açı
+            spot.penumbra = 0.5; // Yumuşak geçiş
+            spot.castShadow=true; 
+            spot.shadow.bias = -0.0001;
+            scene.add(spot); scene.add(spot.target);
+
+            // Yağmur (Hafif ve gri)
+            const rG = new THREE.BufferGeometry(); const rPos = new Float32Array(1500*3);
+            for(let i=0;i<4500;i+=3){ rPos[i]=(Math.random()-0.5)*50; rPos[i+1]=Math.random()*30; rPos[i+2]=(Math.random()-0.5)*40-5;}
+            rG.setAttribute('position', new THREE.BufferAttribute(rPos, 3));
+            // Yağmur rengi grileştirildi
+            rainSystem = new THREE.Points(rG, new THREE.PointsMaterial({color:0x8899aa, size:0.04, transparent:true, opacity:0.3}));
+            scene.add(rainSystem);
+            
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        function createRealistVisitor() {
+            visitorGroup = new THREE.Group();
+            // Kıyafetler daha koyu renkli
+            const coatColor = Math.random()>0.5 ? 0x1b1b1b : 0x263238; 
+            const mat = new THREE.MeshStandardMaterial({color: coatColor, roughness:1.0}); // Parlamayan kumaş
+            const skin = new THREE.MeshStandardMaterial({color: 0x8d6e63, roughness:0.7}); // Gölgede ten rengi
+            
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.7, 0.25), mat); torso.position.y = 1.2;
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.15), skin); head.position.y = 1.65;
+            const lArm = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.7), mat); lArm.position.set(-0.3,1.35,0);
+            const rArm = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.7), mat); rArm.position.set(0.3,1.35,0);
+            const lLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.08,0.85), new THREE.MeshStandardMaterial({color:0x000000})); lLeg.position.set(-0.15,0.425,0);
+            const rLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.08,0.85), new THREE.MeshStandardMaterial({color:0x000000})); rLeg.position.set(0.15,0.425,0);
+            
+            [torso, head, lArm, rArm, lLeg, rLeg].forEach(m => { m.castShadow=true; visitorGroup.add(m); });
+            visitorParts.leftArm=lArm; visitorParts.rightArm=rArm; visitorParts.leftLeg=lLeg; visitorParts.rightLeg=rLeg;
+            
+            // Sislerin içinden gelsin diye biraz daha geriden başlatıyoruz
+            visitorGroup.position.set(0,0,-12); 
+            scene.add(visitorGroup);
+        }
+
+        function setText(txt) { document.getElementById('dialogue-text').innerText = txt; }
+
+        // --- SES ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator(); const g = audioCtx.createGain();
+            osc.connect(g); g.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+            
+            if(type==='buzz_open'){ osc.type='sine'; osc.freq(500,800,0.4); g.env(0.3,0,0.4,now); }
+            else if(type==='buzz_deny'){ osc.type='sawtooth'; osc.freq(100,50,0.4); g.env(0.3,0,0.4,now); } // Daha sert red sesi
+            else if(type==='phone_ring'){ osc.type='square'; osc.freq(400,400,0.05); g.gain.value=0.1; 
+                // Kesik kesik çalan telefon efekti için basit yaklaşım, burada sadece düz ses var
+                 }
+            else if(type==='beep'){ osc.type='sine'; osc.freq(1200,1200,0.05); g.env(0.1,0,0.05,now); }
+            else if(type==='success'){ osc.type='triangle'; osc.freq(440,880,0.5); g.env(0.3,0,0.5,now); }
+            
+            if(type !== 'phone_ring') { osc.start(now); osc.stop(now+0.5); }
+            else { osc.start(now); osc.stop(now+1.5); }
+        }
+        AudioNode.prototype.freq = function(f1,f2,t) { this.frequency.setValueAtTime(f1, audioCtx.currentTime); this.frequency.linearRampToValueAtTime(f2, audioCtx.currentTime+t); }
+        AudioNode.prototype.env = function(v1,v2,t,now) { this.gain.setValueAtTime(v1, now); this.gain.linearRampToValueAtTime(v2, now+t); }
+
+        // --- ANIMASYON ---
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta(); const time = clock.getElapsedTime();
+
+            if(visitorGroup && (gameState==="APPROACHING" || gameState==="LEAVING")) {
+                const dir = gameState==="APPROACHING"?1:-1;
+                // Karanlık olduğu için yürüme hızı bir tık daha yavaş, gerilim artırıcı
+                visitorGroup.position.z += 1.8 * delta * dir; 
+                visitorGroup.rotation.y = gameState==="LEAVING"?Math.PI:0;
+                const s = Math.sin(time*5)*0.3; // Sallanma hızı da yavaşladı
+                visitorParts.leftLeg.rotation.x=s; visitorParts.rightLeg.rotation.x=-s;
+                visitorParts.leftArm.rotation.x=-s; visitorParts.rightArm.rotation.x=s;
+                
+                if(gameState==="APPROACHING" && visitorGroup.position.z >= -2.5) {
+                    gameState="TALKING"; setText(`"${currentVisitor.dialogue}"`);
+                }
+            }
+            const p = rainSystem.geometry.attributes.position.array;
+            for(let i=1;i<p.length;i+=3){ p[i]-=12*delta; if(p[i]<0)p[i]=30; } // Yağmur daha süzülerek yağıyor
+            rainSystem.geometry.attributes.position.needsUpdate=true;
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>

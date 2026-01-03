@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flower Adventure</title>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: 'Arial Black', sans-serif; }
+
+        /* GİRİŞ EKRANI - PASTEL MANZARA VE ÇİÇEKLER */
+        #login-screen { 
+            position: fixed; inset: 0; 
+            background: linear-gradient(180deg, #FFD1DC 0%, #B2E2F2 100%);
+            display: flex; flex-direction: column; justify-content: center; align-items: center; 
+            z-index: 100; 
+        }
+        .flower-layer { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+        .box { 
+            background: rgba(255, 255, 255, 0.85); 
+            padding: 40px; border-radius: 30px; 
+            text-align: center; border: 4px solid #FFB7C5;
+            z-index: 10; backdrop-filter: blur(5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        input { padding: 15px; font-size: 18px; margin: 15px 0; border-radius: 12px; border: 2px solid #FFB7C5; width: 220px; text-align: center; outline: none; }
+        button { padding: 12px 35px; font-size: 18px; cursor: pointer; background: #FF99CC; color: white; border: none; border-radius: 12px; font-weight: bold; }
+
+        /* TARAMA EKRANI */
+        #scan-screen { display: none; position: fixed; inset: 0; background: #000; flex-direction: column; justify-content: center; align-items: center; z-index: 150; color: white; }
+        #video-container { width: 220px; height: 220px; border: 5px solid #FF99CC; border-radius: 50%; overflow: hidden; position: relative; }
+        #webcam { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+
+        /* HATA EKRANI */
+        #fail-screen { 
+            display: none; position: fixed; inset: 0; 
+            background: #000; z-index: 1000; 
+            justify-content: center; align-items: center; 
+        }
+        #fail-screen h1 { 
+            color: #FF0000; 
+            font-size: clamp(40px, 8vw, 100px); 
+            font-weight: 900; letter-spacing: 4px; text-align: center;
+            text-transform: uppercase; margin: 0;
+        }
+
+        /* BAŞARI EKRANI (YENİ EKLENDİ) */
+        #success-screen {
+            display: none; position: fixed; inset: 0; 
+            background: linear-gradient(45deg, #FFD700, #FFFACD); 
+            z-index: 2000; flex-direction: column; justify-content: center; align-items: center;
+            animation: fadeIn 0.5s ease-in;
+        }
+        .trophy { font-size: 120px; margin-bottom: 20px; animation: bounce 1s infinite; }
+        .success-text { color: #D81B60; font-size: 60px; text-align: center; text-shadow: 2px 2px 10px rgba(0,0,0,0.1); }
+        
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* OYUN EKRANI */
+        #game-screen { display: none; position: relative; width: 100%; height: 100%; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+
+    <div id="login-screen">
+        <div class="flower-layer" id="flowerLayer"></div>
+        <div class="box">
+            <h2 style="color: #D81B60; margin:0;">GİRİŞ KODU</h2>
+            <p style="color: #FF69B4; font-size: 14px;">Lütfen erişim anahtarını girin</p>
+            <input type="password" id="passIn" placeholder="••••">
+            <br>
+            <button onclick="checkPass()">BAHÇEYE GİR</button>
+        </div>
+    </div>
+
+    <div id="scan-screen">
+        <h3 style="color: #FF99CC;">BİYOMETRİK TARAMA...</h3>
+        <div id="video-container">
+            <video id="webcam" autoplay playsinline></video>
+        </div>
+    </div>
+
+    <div id="fail-screen">
+        <h1>ERİŞİM ENGELLENDİ</h1>
+    </div>
+
+    <div id="success-screen">
+        <div class="trophy">🏆</div>
+        <div class="success-text">OLEYYY!<br>GİRİŞ ONAYLANDI</div>
+        <button onclick="location.reload()" style="margin-top: 30px;">TEKRAR OYNA</button>
+    </div>
+
+    <div id="game-screen">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <script>
+        const passIn = document.getElementById('passIn');
+        const loginScr = document.getElementById('login-screen');
+        const scanScr = document.getElementById('scan-screen');
+        const failScr = document.getElementById('fail-screen');
+        const successScr = document.getElementById('success-screen');
+        const gameScr = document.getElementById('game-screen');
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const video = document.getElementById('webcam');
+
+        const DOGRU_SIFRE = "2311";
+        const HEDEF_SIFRE = "İBAN";
+        let toplananKod = "";
+        let running = false;
+        let birdY = 300;
+        let pipes = [];
+        let letters = [];
+
+        function setupFlowers() {
+            const layer = document.getElementById('flowerLayer');
+            const icons = ["🌸", "🌼", "🌻", "🌺"];
+            for(let i=0; i<40; i++) {
+                const f = document.createElement('div');
+                f.style.position = "absolute";
+                f.style.left = Math.random() * 100 + "%";
+                f.style.top = Math.random() * 100 + "%";
+                f.style.fontSize = Math.random() * 20 + 20 + "px";
+                f.innerText = icons[Math.floor(Math.random()*icons.length)];
+                layer.appendChild(f);
+            }
+        }
+        setupFlowers();
+
+        function triggerFail() {
+            running = false;
+            loginScr.style.display = "none";
+            scanScr.style.display = "none";
+            gameScr.style.display = "none";
+            failScr.style.display = "flex";
+        }
+
+        // BAŞARI EKRANINI TETİKLEYEN FONKSİYON
+        function triggerSuccess() {
+            running = false;
+            gameScr.style.display = "none";
+            successScr.style.display = "flex";
+        }
+
+        function checkPass() {
+            if (passIn.value === DOGRU_SIFRE) startScanning();
+            else triggerFail();
+        }
+
+        async function startScanning() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                loginScr.style.display = "none";
+                scanScr.style.display = "flex";
+                setTimeout(() => {
+                    stream.getTracks().forEach(t => t.stop());
+                    scanScr.style.display = "none";
+                    gameScr.style.display = "block";
+                    startGame();
+                }, 3000);
+            } catch (e) { triggerFail(); }
+        }
+
+        function startGame() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            running = true;
+            loop();
+        }
+
+        window.onmousemove = (e) => { birdY = e.clientY; };
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === "Space" && running) {
+                letters.forEach((l, i) => {
+                    let dist = Math.sqrt((100 - l.x)**2 + (birdY - l.y)**2);
+                    if (dist < 60) {
+                        toplananKod += l.char;
+                        letters.splice(i, 1);
+                        if (toplananKod.length === 4) {
+                            if (toplananKod !== HEDEF_SIFRE) triggerFail();
+                            else triggerSuccess(); // Alert yerine yeni ekran
+                        }
+                    }
+                });
+            }
+        });
+
+        function loop() {
+            if (!running) return;
+
+            ctx.fillStyle = "#87CEEB"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#FFD700"; ctx.beginPath(); ctx.arc(canvas.width - 80, 80, 40, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(200, 150, 30, 0, Math.PI*2); ctx.arc(230, 150, 40, 0, Math.PI*2); ctx.arc(260, 150, 30, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = "#2ECC71"; ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+            ctx.fillStyle = "#E74C3C"; ctx.beginPath(); ctx.arc(100, birdY, 20, 0, Math.PI * 2); ctx.fill();
+
+            if (pipes.length === 0 || pipes[pipes.length - 1].x < canvas.width - 400) {
+                const gap = 250;
+                const h = Math.random() * (canvas.height - 400) + 100;
+                pipes.push({ x: canvas.width, y: h, gap: gap });
+                const chars = ["İ", "B", "A", "N", "X", "Y"];
+                letters.push({ x: canvas.width + 15, y: h + gap/2, char: chars[Math.floor(Math.random()*chars.length)] });
+            }
+
+            pipes.forEach((p, i) => {
+                p.x -= 5;
+                ctx.fillStyle = "#5DADE2";
+                ctx.fillRect(p.x, 0, 30, p.y); 
+                ctx.fillRect(p.x, p.y + p.gap, 30, canvas.height);
+                if (100 + 20 > p.x && 100 - 20 < p.x + 30) {
+                    if (birdY - 20 < p.y || birdY + 20 > p.y + p.gap) triggerFail();
+                }
+            });
+
+            letters.forEach((l, i) => {
+                l.x -= 5;
+                ctx.fillStyle = "black"; ctx.font = "bold 40px Arial";
+                ctx.fillText(l.char, l.x, l.y);
+            });
+
+            ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.fillRect(10, 10, 200, 40);
+            ctx.fillStyle = "#D81B60"; ctx.font = "bold 20px Arial";
+            ctx.fillText("KOD: " + toplananKod, 30, 38);
+
+            requestAnimationFrame(loop);
+        }
+    </script>
+</body>
+</html>

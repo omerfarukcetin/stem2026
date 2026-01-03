@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Kelime Bahçesi: Final Güvenlik Modu 🌸</title>
+    <style>
+        /* --- 1. GENEL AYARLAR & ARKA PLAN --- */
+        body { 
+            margin: 0; overflow: hidden; 
+            font-family: 'Arial', sans-serif; user-select: none;
+            touch-action: none;
+            transition: background 0.5s;
+        }
+
+        /* VARSAYILAN: MASUM MOD (PEMBE) */
+        body.innocent {
+            background: linear-gradient(180deg, #ffe6f2 0%, #fff0f5 100%);
+            color: #d63384;
+        }
+        /* Arka plan süsleri (Sabit) */
+        body.innocent::before {
+            content: "🌸 🦋 🌷 🐞 🌼 🐝 🌻";
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            font-size: 50px; opacity: 0.1; z-index: -1;
+            display: flex; flex-wrap: wrap; justify-content: space-around; align-content: center;
+            pointer-events: none;
+        }
+
+        /* HACKER MODU (Hata Yapınca) */
+        body.hacker {
+            background: #000 !important;
+            color: #0f0 !important;
+        }
+        body.hacker::before { display: none; } /* Süsleri gizle */
+        body.hacker canvas { filter: drop-shadow(0 0 5px lime); }
+        
+        /* --- 2. OYUN SAHASI --- */
+        canvas { 
+            display: block; position: absolute; top: 0; left: 0; z-index: 1; 
+        }
+
+        /* UI KATMANI (Puan, Süre vb.) */
+        #game-ui {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10; pointer-events: none; display: none; /* Başta gizli */
+        }
+        .hud-top {
+            display: flex; justify-content: space-between; padding: 15px;
+            font-size: 20px; font-weight: bold;
+        }
+        #collected-word {
+            position: absolute; bottom: 50px; width: 100%; text-align: center;
+            font-size: 40px; font-family: monospace; font-weight: bold; letter-spacing: 5px;
+        }
+
+        /* --- 3. MENÜLER VE MODALLAR --- */
+        
+        /* GİRİŞ EKRANI */
+        #start-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,240,245, 0.9); z-index: 50;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .big-btn {
+            background: #ff1493; color: white; border: none; padding: 20px 50px;
+            font-size: 22px; border-radius: 50px; cursor: pointer; margin-top: 20px;
+            box-shadow: 0 10px 20px rgba(255,20,147,0.3);
+            transition: transform 0.2s;
+        }
+        .big-btn:active { transform: scale(0.95); }
+
+        /* TARAMA MODALI (KAMERA BURADA) */
+        #scan-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.95); z-index: 100;
+            display: none; /* JS ile açılacak */
+            flex-direction: column; align-items: center; justify-content: center;
+        }
+        .camera-box {
+            position: relative; width: 300px; height: 300px;
+            border: 4px solid #00ff00; border-radius: 20px; overflow: hidden;
+            box-shadow: 0 0 30px #00ff00; background: #000;
+        }
+        #webcam {
+            width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);
+        }
+        .scan-laser {
+            position: absolute; top: 0; left: 0; width: 100%; height: 4px;
+            background: #00ff00; box-shadow: 0 0 10px #00ff00;
+            animation: scanning 1.5s infinite ease-in-out;
+        }
+        @keyframes scanning { 0% {top:0;} 50% {top:100%;} 100% {top:0;} }
+        #scan-text {
+            color: #00ff00; font-family: monospace; font-size: 18px; margin-top: 20px;
+            text-align: center;
+        }
+
+        /* SONUÇ EKRANLARI */
+        #win-screen, #lose-screen {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 200; align-items: center; justify-content: center; flex-direction: column;
+        }
+        #win-screen { background: rgba(255, 215, 0, 0.95); color: #d35400; }
+        #lose-screen { background: black; color: red; }
+        .result-box {
+            background: white; padding: 40px; border-radius: 20px; text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+    </style>
+</head>
+<body class="innocent">
+
+    <div id="start-screen">
+        <h1 style="color:#ff69b4; font-size:40px; text-shadow: 2px 2px white;">🌸 KELİME BAHÇESİ 🌸</h1>
+        <p style="color:#555;">Harfleri topla, seviyeleri geç!</p>
+        <button class="big-btn" id="btn-start">OYUNA BAŞLA</button>
+    </div>
+
+    <div id="scan-modal">
+        <div class="camera-box">
+            <video id="webcam" autoplay playsinline muted></video>
+            <div class="scan-laser"></div>
+        </div>
+        <div id="scan-text">YÜZ TARANIYOR...</div>
+    </div>
+
+    <div id="game-ui">
+        <div class="hud-top">
+            <span>HEDEF: <span id="lbl-target" style="color:red"></span></span>
+            <span>SÜRE: <span id="lbl-timer"></span></span>
+        </div>
+        <div style="position:absolute; top:50px; left:15px; font-weight:bold;">SEVİYE: <span id="lbl-level">1</span></div>
+        <div id="collected-word"></div>
+    </div>
+    
+    <canvas id="canvas"></canvas>
+
+    <div id="win-screen">
+        <div class="result-box">
+            <div style="font-size:60px;">🏆</div>
+            <h1>TEBRİKLER!</h1>
+            <button class="big-btn" style="background:#28a745;" onclick="nextLevel()">SONRAKİ SEVİYE ➡</button>
+        </div>
+    </div>
+
+    <div id="lose-screen">
+        <div style="font-size:100px;">💀</div>
+        <h1 style="font-family:Courier;">SİSTEM KİLİTLENDİ</h1>
+        <button class="big-btn" style="background:transparent; border:2px solid red; color:red;" onclick="location.reload()">TEKRAR DENE</button>
+    </div>
+
+    <audio id="s-click" src="https://actions.google.com/sounds/v1/ui/click_on.ogg"></audio>
+    <audio id="s-win" src="https://actions.google.com/sounds/v1/cartoon/clown_horn.ogg"></audio>
+    <audio id="s-lose" src="https://actions.google.com/sounds/v1/horror/female_scream_loud.ogg"></audio>
+    <audio id="s-error" src="https://actions.google.com/sounds/v1/alarms/bugle_tune.ogg"></audio>
+
+    <script>
+        // --- AYARLAR VE DEĞİŞKENLER ---
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const videoEl = document.getElementById('webcam');
+        
+        let width, height;
+        let isRunning = false;
+        let level = 1;
+        let drops = [];
+        let target = "";
+        let collected = "";
+        let timer = 0;
+        let timerInt;
+        let fails = 0;
+        let streamRef = null; // Kamerayı kapatmak için referans
+
+        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+        // --- 1. BAŞLATMA VE KAMERA SÜRECİ ---
+        document.getElementById('btn-start').addEventListener('click', async () => {
+            playSound('s-click');
+            
+            // Giriş ekranını gizle
+            document.getElementById('start-screen').style.display = 'none';
+            
+            // Tarama ekranını aç
+            document.getElementById('scan-modal').style.display = 'flex';
+
+            // Kamerayı açmayı dene
+            try {
+                streamRef = await navigator.mediaDevices.getUserMedia({ video: true });
+                videoEl.srcObject = streamRef;
+                
+                // Sahte Tarama Animasyonu (3 saniye)
+                let percent = 0;
+                const scanInterval = setInterval(() => {
+                    percent += 2;
+                    document.getElementById('scan-text').innerText = `YÜZ TARANIYOR... %${percent}`;
+                    if(percent >= 100) {
+                        clearInterval(scanInterval);
+                        finishScanning(); // Taramayı bitir
+                    }
+                }, 40);
+
+            } catch (err) {
+                // Kamera yoksa veya izin verilmezse direkt oyuna geç
+                alert("Kamera bulunamadı, manuel giriş yapılıyor...");
+                finishScanning();
+            }
+        });
+
+        function finishScanning() {
+            // 1. Kamerayı durdur ve kapat
+            if(streamRef) {
+                streamRef.getTracks().forEach(track => track.stop());
+                videoEl.srcObject = null;
+            }
+
+            // 2. Tarama ekranını gizle
+            document.getElementById('scan-modal').style.display = 'none';
+
+            // 3. Oyun arayüzünü aç
+            document.getElementById('game-ui').style.display = 'block';
+
+            // 4. Oyunu başlat
+            initGame();
+        }
+
+        // --- 2. OYUN MEKANİĞİ ---
+        function initGame() {
+            // Ekran Boyutu
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+
+            // Değişkenleri Sıfırla
+            document.body.className = "innocent"; // Temayı Pembe Yap
+            fails = 0;
+            drops = [];
+            collected = "";
+            isRunning = true;
+            document.getElementById('win-screen').style.display = 'none';
+
+            // Seviye Zorluğu
+            let len = 4 + level; if(len > 10) len = 10;
+            let timeMax = 60 - (level * 3); if(timeMax < 20) timeMax = 20;
+
+            // Hedef Kelime
+            target = "";
+            for(let i=0; i<len; i++) target += chars[Math.floor(Math.random() * chars.length)];
+            
+            // UI Güncelle
+            document.getElementById('lbl-target').innerText = target;
+            document.getElementById('lbl-level').innerText = level;
+            timer = timeMax;
+            updateWordUI();
+
+            // Sayaç Başlat
+            if(timerInt) clearInterval(timerInt);
+            timerInt = setInterval(() => {
+                if(!isRunning) return;
+                timer--;
+                document.getElementById('lbl-timer').innerText = timer;
+                
+                if(timer <= 10) document.body.className = "hacker"; // Son 10sn gerilim
+                if(timer <= 0) gameOver();
+            }, 1000);
+
+            // Animasyon Döngüsü
+            gameLoop();
+        }
+
+        function gameLoop() {
+            if(!isRunning) return;
+            ctx.clearRect(0,0,width,height);
+
+            // Harf Düşürme
+            if(Math.random() < 0.04) { // Düşme sıklığı
+                let charVal;
+                let needed = target[collected.length];
+                
+                // Yardım şansı (Seviye arttıkça azalır)
+                let help = 0.5 - (level * 0.05); if(help < 0.1) help = 0.1;
+
+                if(Math.random() < help && needed) charVal = needed;
+                else charVal = chars[Math.floor(Math.random() * chars.length)];
+
+                drops.push({
+                    x: Math.random() * (width - 50) + 25,
+                    y: -50,
+                    val: charVal,
+                    speed: 3 + (level * 0.5) + Math.random() * 2
+                });
+            }
+
+            // Çizim ve Hareket
+            drops.forEach((d, i) => {
+                d.y += d.speed;
+                
+                // Tema Rengi
+                ctx.fillStyle = document.body.classList.contains('hacker') ? "#0f0" : "#ff1493";
+                ctx.font = "bold 45px Courier New";
+                ctx.fillText(d.val, d.x, d.y);
+
+                // Ekrandan çıkarsa sil
+                if(d.y > height) drops.splice(i, 1);
+            });
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- 3. KONTROLLER ---
+        function handleInput(x, y) {
+            if(!isRunning) return;
+
+            for(let i=0; i<drops.length; i++) {
+                let d = drops[i];
+                // Tıklama mesafesi
+                if(Math.hypot(d.x - x, d.y - y) < 80) {
+                    let needed = target[collected.length];
+
+                    if(d.val === needed) {
+                        // DOĞRU
+                        playSound('s-click');
+                        collected += d.val;
+                        drops.splice(i, 1);
+                        updateWordUI();
+
+                        if(collected === target) winGame();
+                    } else {
+                        // YANLIŞ
+                        playSound('s-error');
+                        fails++;
+                        document.body.className = "hacker"; // Hata yapınca kararır
+                        drops.splice(i, 1);
+                        if(fails >= 3) gameOver();
+                    }
+                    return;
+                }
+            }
+        }
+
+        canvas.addEventListener('mousedown', e => handleInput(e.clientX, e.clientY));
+        canvas.addEventListener('touchstart', e => {
+            e.preventDefault();
+            handleInput(e.touches[0].clientX, e.touches[0].clientY);
+        }, {passive:false});
+
+        // --- 4. YARDIMCILAR ---
+        function updateWordUI() {
+            let txt = "";
+            for(let i=0; i<target.length; i++) {
+                txt += (i < collected.length ? collected[i] : "_") + " ";
+            }
+            document.getElementById('collected-word').innerText = txt;
+        }
+
+        function winGame() {
+            isRunning = false;
+            clearInterval(timerInt);
+            playSound('s-win');
+            document.getElementById('win-screen').style.display = 'flex';
+        }
+
+        function gameOver() {
+            isRunning = false;
+            clearInterval(timerInt);
+            playSound('s-lose');
+            document.getElementById('game-ui').style.display = 'none';
+            document.getElementById('lose-screen').style.display = 'flex';
+        }
+
+        function nextLevel() {
+            level++;
+            initGame();
+        }
+
+        function playSound(id) {
+            const s = document.getElementById(id);
+            if(s) { s.currentTime=0; s.play().catch(()=>{}); }
+        }
+
+        window.onresize = () => { width=window.innerWidth; height=window.innerHeight; canvas.width=width; canvas.height=height; };
+
+    </script>
+</body>
+</html>

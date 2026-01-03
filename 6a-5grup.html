@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Şifrematik - 100 Saniye Seviyesi</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+    <style>
+        body { margin: 0; background-color: #001f3f; color: white; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; position: relative; }
+        #bg-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; opacity: 0.15; }
+        #timer { position: fixed; top: 20px; right: 20px; font-size: 2rem; background: #ff4136; padding: 10px 25px; border-radius: 50px; z-index: 100; box-shadow: 0 0 15px rgba(255, 65, 54, 0.5); display: none; }
+        #auth-section, #game-section, #result-section { text-align: center; width: 90%; max-width: 600px; z-index: 10; }
+        #video-container { width: 300px; height: 300px; border: 5px solid #39cccc; border-radius: 20px; overflow: hidden; margin: 20px auto; background: #000; }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        .password-container { background: white; padding: 20px; border-radius: 15px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: sticky; top: 10px; z-index: 20; }
+        input { width: 90%; padding: 15px; font-size: 1.4rem; border: 3px solid #001f3f; border-radius: 8px; color: #333; outline: none; }
+        #result-section { display: none; background: rgba(0, 0, 0, 0.8); padding: 40px; border-radius: 20px; border: 2px dashed #39cccc; }
+        button { padding: 15px 30px; font-size: 1.1rem; border: none; border-radius: 10px; cursor: pointer; margin: 10px; font-weight: bold; }
+        .btn-copy { background: #39cccc; color: #001f3f; }
+        .btn-retry { background: #2ecc40; color: white; }
+        #rules-wrapper { max-height: 40vh; overflow-y: auto; margin-top: 10px; padding-right: 5px; }
+        .rule-card { padding: 15px; border-radius: 10px; background: rgba(255, 255, 255, 0.1); border: 2px solid #ff4136; text-align: left; margin-bottom: 10px; animation: fadeIn 0.4s; }
+        .rule-card.valid { border-color: #2ecc40; background: rgba(46, 204, 64, 0.2); opacity: 0.6; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        h1 { font-size: 3.5rem; margin-bottom: 5px; text-shadow: 0 0 20px rgba(57, 204, 204, 0.5); }
+    </style>
+</head>
+<body>
+    <canvas id="bg-canvas"></canvas>
+    <div id="timer">100</div>
+
+    <div id="auth-section">
+        <h1>Şifrematik</h1>
+        <p id="status">Kamera hazırlanıyor...</p>
+        <div id="video-container"><video id="webcam" autoplay muted playsinline></video></div>
+    </div>
+
+    <div id="game-section" style="display: none;">
+        <h1>Şifrematik</h1>
+        <div id="strength-meter">Tamamlanan: <span id="strength-text" style="color:#ff4136">0/50</span></div>
+        <div class="password-container">
+            <input type="text" id="passwordInput" placeholder="Buraya yazın..." autocomplete="off">
+        </div>
+        <div id="rules-wrapper"><div id="rules-container"></div></div>
+    </div>
+
+    <div id="result-section">
+        <h2 id="resultTitle" style="font-size: 3rem; color: #ff4136;">SÜRE BİTTİ!</h2>
+        <div style="background: white; color: #333; padding: 15px; border-radius: 10px; margin: 20px 0; word-break: break-all;" id="finalPassword"></div>
+        <button class="btn-copy" onclick="copyPassword()">Şifreyi Kopyala</button>
+        <button class="btn-retry" onclick="resetGame()">Yeniden Dene</button>
+    </div>
+
+    <script>
+        /* --- ARKA PLAN --- */
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height, columns, drops = [];
+        const text = "ŞİFREMATİK";
+        const fonts = ["Arial", "Impact", "Verdana"];
+
+        function resizeCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            columns = Math.floor(width / 150);
+            drops = Array(columns).fill(0).map(() => Math.random() * -100);
+        }
+
+        function drawBackground() {
+            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = "#39cccc";
+            for (let i = 0; i < drops.length; i++) {
+                ctx.font = `bold ${Math.random() * 20 + 15}px ${fonts[i % fonts.length]}`;
+                ctx.fillText(text, i * 150, drops[i] * 20);
+                if (drops[i] * 20 > height && Math.random() > 0.975) drops[i] = 0;
+                drops[i]++;
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        setInterval(drawBackground, 50);
+
+        /* --- OYUN --- */
+        const video = document.getElementById('webcam');
+        const status = document.getElementById('status');
+        const authSection = document.getElementById('auth-section');
+        const gameSection = document.getElementById('game-section');
+        const resultSection = document.getElementById('result-section');
+        const timerDisplay = document.getElementById('timer');
+        const passwordInput = document.getElementById('passwordInput');
+        const rulesContainer = document.getElementById('rules-container');
+
+        let timeLeft = 100; // 100 SANİYE
+        let timerInterval;
+
+        const allRules = [
+            { t: "En az 5 karakter.", c: s => s.length >= 5 },
+            { t: "Bir büyük harf.", c: s => /[A-Z]/.test(s) },
+            { t: "Bir rakam.", c: s => /[0-9]/.test(s) },
+            { t: "Bir özel karakter (!, @, #).", c: s => /[!@#$%^&*]/.test(s) },
+            { t: "Bir gezegen adı (Mars, Dünya vb.).", c: s => /(merkur|merkür|venus|venüs|dunya|dünya|mars|jupiter|jüpiter|saturn|satürn|uranus|uranüs|neptun|neptün)/i.test(s) },
+            { t: "Rakamların toplamı tam 30 olmalı.", c: s => (s.match(/\d/g) || []).reduce((a, b) => a + parseInt(b), 0) === 30 },
+            { t: "Bir Roma rakamı (I, V, X).", c: s => /[IVX]/.test(s) },
+            { t: "Şifrenin sonu nokta (.) ile bitmeli.", c: s => s.endsWith('.') },
+            { t: "En az bir renk adı (Mavi, Sarı...).", c: s => /(mavi|kırmızı|sarı|yeşil|mor|turuncu|beyaz|siyah|pembe|al|ak|kara)/i.test(s) },
+            { t: "Bir satranç taşı (Kale, At, Fil...).", c: s => /(kale|at|fil|vezir|sah|şah|piyon)/i.test(s) },
+            { t: "Şifrede bir mevsim adı geçmeli.", c: s => /(yaz|kış|ilkbahar|sonbahar)/i.test(s) },
+            { t: "Şifrede '?' işareti olmalı.", c: s => s.includes("?") },
+            { t: "Bir element sembolü (He, Li, Au...).", c: s => /(H|He|Li|Be|B|C|N|O|F|Ne|Na|Mg|Al|Si|P|S|Cl|Ar|K|Ca|Fe|Cu|Zn|Ag|Au|Hg|Pb)/.test(s) },
+            { t: "O anki saat yazmalı.", c: s => s.includes(new Date().getHours().toString()) },
+            { t: "Şifrede 'AI' kelimesi geçmeli.", c: s => s.toUpperCase().includes("AI") },
+            { t: "Bir kıta adı (Asya, Avrupa...).", c: s => /(asya|avrupa|afrika|antarktika|amerika|okyanusya)/i.test(s) },
+            { t: "Bir nota adı (Do, Re, Mi...).", c: s => /(do|re|mi|fa|sol|la|si)/i.test(s) },
+            { t: "Şifrede o anki yıl (2025/2026) olmalı.", c: s => s.includes("2025") || s.includes("2026") },
+            { t: "Bir başkent adı.", c: s => /(ankara|londra|paris|berlin|roma|tokyo|washington)/i.test(s) },
+            { t: "En az 25 karakter uzunluk.", c: s => s.length >= 25 }
+        ];
+
+        for (let i = allRules.length + 1; i <= 50; i++) {
+            allRules.push({ t: `Şifre uzunluğu en az ${i + 10} karakter olmalı.`, c: s => s.length >= i + 10 });
+        }
+
+        async function init() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                const model = await cocoSsd.load();
+                status.innerText = "Yüz taranıyor...";
+                detect(model);
+            } catch (err) { status.innerText = "Kamera erişimi reddedildi!"; }
+        }
+
+        async function detect(model) {
+            const predictions = await model.detect(video);
+            if (predictions.some(p => p.class === 'person')) {
+                status.innerText = "Doğrulandı!";
+                setTimeout(startGame, 1000);
+            } else { requestAnimationFrame(() => detect(model)); }
+        }
+
+        function startGame() {
+            authSection.style.display = 'none';
+            gameSection.style.display = 'block';
+            timerDisplay.style.display = 'block';
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timerDisplay.innerText = timeLeft;
+                if (timeLeft <= 0) endGame("SÜRE BİTTİ!");
+            }, 1000);
+        }
+
+        function updateRules(val) {
+            rulesContainer.innerHTML = '';
+            let completed = 0;
+            for (let i = 0; i < allRules.length; i++) {
+                const isValid = allRules[i].c(val);
+                const div = document.createElement('div');
+                div.className = `rule-card ${isValid ? 'valid' : ''}`;
+                div.innerText = `Kural ${i+1}: ${allRules[i].t}`;
+                rulesContainer.prepend(div);
+                if (isValid) completed++; else break;
+            }
+            document.getElementById('strength-text').innerText = `${completed}/50`;
+            if (completed === 50) endGame("KAZANDIN!");
+        }
+
+        function endGame(title) {
+            clearInterval(timerInterval);
+            gameSection.style.display = 'none';
+            timerDisplay.style.display = 'none';
+            resultSection.style.display = 'block';
+            document.getElementById('resultTitle').innerText = title;
+            document.getElementById('resultTitle').style.color = title === "KAZANDIN!" ? "#2ecc40" : "#ff4136";
+            document.getElementById('finalPassword').innerText = passwordInput.value || "---";
+        }
+
+        function copyPassword() {
+            navigator.clipboard.writeText(passwordInput.value);
+            alert("Kopyalandı!");
+        }
+
+        function resetGame() { location.reload(); }
+
+        passwordInput.addEventListener('input', (e) => updateRules(e.target.value));
+        init();
+    </script>
+</body>
+</html>

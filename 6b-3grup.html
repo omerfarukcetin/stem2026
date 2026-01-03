@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MrM SYSTEM: Ultimate Hub</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;800&family=Rajdhani:wght@300;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --soft-blue: #e3f2fd;
+            --main-blue: #2196f3;
+            --neon-blue: #00e5ff;
+            --glass-bg: rgba(255, 255, 255, 0.90);
+            --deep-glass: rgba(240, 248, 255, 0.95);
+        }
+
+        body {
+            margin: 0; overflow: hidden;
+            background: linear-gradient(135deg, #cfd9df 0%, #e2ebf0 100%);
+            font-family: 'Rajdhani', sans-serif;
+            color: #333; user-select: none;
+        }
+
+        /* --- ARKA PLAN (KAR & SAKURA) --- */
+        #bg-effects { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+        .particle { position: absolute; border-radius: 50%; opacity: 0.7; }
+        .snow { background: white; box-shadow: 0 0 5px rgba(255,255,255,0.8); }
+        .sakura { 
+            background: #4facfe; width: 12px; height: 12px;
+            clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+        }
+
+        /* --- ANA YAPI --- */
+        .container {
+            position: relative; z-index: 10;
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh;
+        }
+
+        .panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 2px solid white;
+            box-shadow: 0 20px 50px rgba(0, 168, 255, 0.15);
+            border-radius: 20px; padding: 40px; text-align: center;
+            width: 90%; max-width: 950px;
+            display: none; opacity: 0; transform: scale(0.95);
+            transition: all 0.6s ease;
+        }
+        .panel.active { display: block; opacity: 1; transform: scale(1); }
+
+        h1, h2 { font-family: 'Orbitron', sans-serif; color: var(--main-blue); margin-bottom: 15px; }
+
+        /* --- KAMERA & TARAMA --- */
+        .scanner-container {
+            position: relative; width: 340px; height: 260px; margin: 0 auto 20px;
+            border-radius: 10px; overflow: hidden; background: #000;
+            border: 2px solid var(--neon-blue);
+            box-shadow: 0 0 20px rgba(0, 229, 255, 0.3);
+        }
+        video, #captured-img { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        
+        .laser-line {
+            position: absolute; top: 0; left: 0; width: 100%; height: 2px;
+            background: var(--neon-blue); box-shadow: 0 0 10px var(--neon-blue);
+            animation: scanAnim 1.5s ease-in-out infinite; display: none;
+        }
+        @keyframes scanAnim { 0% {top: 5%; opacity: 0.5;} 50% {top: 95%; opacity: 1;} 100% {top: 5%; opacity: 0.5;} }
+
+        /* --- BUTONLAR --- */
+        .btn {
+            background: linear-gradient(90deg, #2196f3, #00e5ff);
+            color: white; border: none; padding: 12px 35px;
+            font-family: 'Orbitron', sans-serif; font-size: 14px; letter-spacing: 1px;
+            border-radius: 50px; cursor: pointer; transition: 0.3s;
+            box-shadow: 0 5px 15px rgba(33, 150, 243, 0.3); margin: 5px;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(33, 150, 243, 0.5); }
+        .btn-back { background: #ff5252; padding: 8px 20px; font-size: 12px; position: absolute; top: 20px; left: 20px; }
+
+        /* --- HUB & GRID --- */
+        .menu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 20px; }
+        .menu-card {
+            background: white; padding: 20px; border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05); transition: 0.3s;
+        }
+        .menu-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,168,255,0.2); }
+
+        /* --- YENİ MAĞAZA TARAYICISI --- */
+        .browser-bar {
+            display: flex; gap: 10px; background: #f1f1f1; padding: 10px;
+            border-radius: 10px 10px 0 0; align-items: center;
+        }
+        .browser-bar select, .browser-bar input {
+            padding: 10px; border-radius: 5px; border: 1px solid #ccc; flex: 1;
+        }
+        #store-frame {
+            width: 100%; height: 450px; border: none; background: white;
+            border-radius: 0 0 10px 10px; border: 1px solid #ddd;
+        }
+
+        /* --- ŞİFRE OLUŞTURUCU --- */
+        .pass-box {
+            background: #fff; padding: 20px; border-radius: 15px; margin-top: 20px;
+            display: flex; flex-direction: column; gap: 15px;
+        }
+        .pass-display {
+            background: #f8f9fa; border: 2px solid var(--main-blue); padding: 15px;
+            font-family: monospace; font-size: 24px; letter-spacing: 2px;
+            border-radius: 8px; color: #333; cursor: pointer;
+        }
+        .pass-options label { margin: 0 10px; font-size: 14px; cursor: pointer; }
+
+        /* --- SAKURA --- */
+        #magic-sakura {
+            font-size: 60px; cursor: pointer; color: var(--main-blue);
+            filter: drop-shadow(0 0 10px var(--neon-blue));
+            animation: pulse 2s infinite; display: none; margin-top: 20px;
+        }
+        @keyframes pulse { 0% {transform: scale(1);} 50% {transform: scale(1.1);} 100% {transform: scale(1);} }
+
+        /* --- ROBOT TEST --- */
+        .grid-container { display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; margin-top: 20px; }
+        .grid-item {
+            width: 90px; height: 90px; background: white; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center; font-size: 40px;
+            cursor: pointer; box-shadow: 0 5px 10px rgba(0,0,0,0.05);
+        }
+
+    </style>
+</head>
+<body onload="initApp()">
+
+    <div id="bg-effects"></div>
+
+    <div class="container">
+
+        <div id="scr-scan" class="panel active">
+            <h1>SİSTEM GİRİŞİ</h1>
+            <p id="scan-msg">Yüz tanıma sistemi başlatılıyor...</p>
+            
+            <div class="scanner-container">
+                <video id="webcam" autoplay playsinline muted></video>
+                <img id="captured-img" style="display:none;">
+                <canvas id="snap-canvas" width="320" height="240" style="display:none;"></canvas>
+                <div id="laser" class="laser-line"></div>
+            </div>
+
+            <button id="btn-scan" class="btn" onclick="startScan()">TARAMAYI BAŞLAT</button>
+            
+            <div id="sakura-zone" style="display:flex; justify-content:center;">
+                <div id="magic-sakura" onclick="sakuraClick()">💠</div>
+            </div>
+        </div>
+
+        <div id="scr-verify" class="panel">
+            <h2>GÜVENLİK DUVARI</h2>
+            <p>Hangisi <b style="color:var(--main-blue)">GERÇEK İNSAN</b>?</p>
+            <div id="verify-grid" class="grid-container"></div>
+        </div>
+
+        <div id="scr-hub" class="panel">
+            <div style="margin-bottom:20px;">
+                <img id="avatar-hub" style="width:100px; height:100px; border-radius:50%; border:3px solid var(--main-blue); object-fit:cover;">
+                <h3>HOŞGELDİNİZ</h3>
+            </div>
+            
+            <div class="menu-grid">
+                <div class="menu-card">
+                    <h4>🛍️ SANAL MAĞAZA</h4>
+                    <p style="font-size:12px; color:#666;">Trendyol, Hepsiburada...</p>
+                    <button class="btn" onclick="show('scr-store')">GİRİŞ</button>
+                </div>
+                
+                <div class="menu-card">
+                    <h4>🗝️ HAPİSHANE KAÇIŞI</h4>
+                    <p style="font-size:12px; color:#666;">Multiplayer Escape Game</p>
+                    <button class="btn" onclick="openGame()">OYNA</button>
+                </div>
+
+                <div class="menu-card">
+                    <h4>🔐 ŞİFRE OLUŞTUR</h4>
+                    <p style="font-size:12px; color:#666;">Güvenli Anahtar Üretici</p>
+                    <button class="btn" onclick="show('scr-passgen')">OLUŞTUR</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="scr-store" class="panel" style="max-width:1000px;">
+            <button class="btn btn-back" onclick="show('scr-hub')">⬅ GERİ</button>
+            <h2>MAĞAZA TARAYICISI</h2>
+            
+            <div class="browser-bar">
+                <select id="siteSelect">
+                    <option value="trendyol">Trendyol</option>
+                    <option value="hepsiburada">Hepsiburada</option>
+                    <option value="amazon">Amazon</option>
+                    <option value="n11">N11</option>
+                    <option value="ciceksepeti">Çiçeksepeti</option>
+                </select>
+                <input type="text" id="productInput" placeholder="Ne arıyorsunuz? (Örn: Kulaklık, Mont)">
+                <button class="btn" style="margin:0; padding:10px 20px;" onclick="loadStore()">ARA & AÇ</button>
+            </div>
+
+            <iframe id="store-frame" src="about:blank"></iframe>
+            <p style="font-size:11px; color:#888; margin-top:5px;">Not: Güvenlik protokolleri gereği arama sonuçları özel tarayıcıda listelenir.</p>
+        </div>
+
+        <div id="scr-passgen" class="panel">
+            <button class="btn btn-back" onclick="show('scr-hub')">⬅ GERİ</button>
+            <h2>ŞİFRE JENERATÖRÜ</h2>
+            
+            <div class="pass-box">
+                <div class="pass-display" id="pass-output" onclick="copyPass()">Şifre Buraya Gelecek</div>
+                <div style="color:green; font-size:12px; display:none;" id="copy-msg">Kopyalandı!</div>
+                
+                <div class="pass-options">
+                    <label><input type="checkbox" id="chk-num" checked> Rakamlar (0-9)</label>
+                    <label><input type="checkbox" id="chk-sym" checked> Semboller (!@#)</label>
+                    <label><input type="checkbox" id="chk-upper" checked> BÜYÜK HARF</label>
+                </div>
+                
+                <input type="range" id="pass-len" min="6" max="24" value="12" oninput="document.getElementById('len-val').innerText=this.value">
+                <div>Uzunluk: <span id="len-val" style="color:var(--main-blue); font-weight:bold;">12</span> Karakter</div>
+
+                <button class="btn" onclick="generatePass()">ŞİFRE OLUŞTUR</button>
+            </div>
+        </div>
+
+        <div id="scr-game" class="panel" style="max-width:1000px; padding:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <h3>ESCAPE FROM PRISON</h3>
+                <button class="btn btn-back" style="position:relative; top:0; left:0;" onclick="closeGame()">KAPAT</button>
+            </div>
+            <iframe id="game-frame-src" style="width:100%; height:500px; border-radius:10px; border:none;" src=""></iframe>
+        </div>
+
+    </div>
+
+<script>
+    let userPhoto = null;
+    let sakuraCount = 0;
+
+    function initApp() {
+        createEffects();
+        startCam();
+    }
+
+    function show(id) {
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+    }
+
+    /* --- EFEKTLER (KAR & SAKURA) --- */
+    function createEffects() {
+        const bg = document.getElementById('bg-effects');
+        for(let i=0; i<50; i++) {
+            let p = document.createElement('div');
+            let isSakura = Math.random() > 0.6;
+            p.className = isSakura ? 'particle sakura' : 'particle snow';
+            p.style.left = Math.random()*100 + 'vw';
+            p.style.top = Math.random()*-20 + 'vh';
+            let d = Math.random()*5+5;
+            p.style.animation = `fall ${d}s linear infinite`;
+            bg.appendChild(p);
+        }
+        let s = document.createElement('style');
+        s.innerHTML = `@keyframes fall { to { transform: translateY(110vh) rotate(360deg); } }`;
+        document.head.appendChild(s);
+    }
+
+    /* --- YÜZ TANIMA --- */
+    async function startCam() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({video:true});
+            document.getElementById('webcam').srcObject = stream;
+        } catch(e) { console.log(e); }
+    }
+
+    function startScan() {
+        document.getElementById('btn-scan').style.display = 'none';
+        document.getElementById('laser').style.display = 'block';
+        document.getElementById('scan-msg').innerText = "Biyometrik analiz yapılıyor...";
+        document.getElementById('scan-msg').style.color = "var(--main-blue)";
+
+        setTimeout(() => {
+            const v = document.getElementById('webcam');
+            const c = document.getElementById('snap-canvas');
+            const x = c.getContext('2d');
+            x.translate(320,0); x.scale(-1,1);
+            x.drawImage(v,0,0,320,240);
+            userPhoto = c.toDataURL('image/png');
+            
+            document.getElementById('captured-img').src = userPhoto;
+            document.getElementById('avatar-hub').src = userPhoto;
+            
+            v.style.display = 'none';
+            document.getElementById('captured-img').style.display = 'block';
+            document.getElementById('laser').style.display = 'none';
+            document.getElementById('scan-msg').innerHTML = "Doğrulama Başarılı! <br> Mavi Kristal'i yakala.";
+            
+            document.getElementById('magic-sakura').style.display = 'block';
+        }, 2500);
+    }
+
+    /* --- SAKURA OYUNU --- */
+    function sakuraClick() {
+        sakuraCount++;
+        const btn = document.getElementById('magic-sakura');
+        if(sakuraCount < 4) {
+            btn.style.transform = `translate(${(Math.random()-0.5)*200}px, ${(Math.random()-0.5)*100}px)`;
+        } else {
+            loadVerify();
+        }
+    }
+
+    /* --- DOĞRULAMA --- */
+    function loadVerify() {
+        show('scr-verify');
+        const g = document.getElementById('verify-grid');
+        g.innerHTML = "";
+        let items = [
+            {t:'bot', c:'🤖'}, {t:'bot', c:'🤡'}, {t:'bot', c:'💀'},
+            {t:'user', c:`<img src="${userPhoto}" style="width:100%; height:100%; object-fit:cover; border-radius:10px;">`}
+        ];
+        items.sort(()=>Math.random()-0.5);
+        items.forEach(i => {
+            let d = document.createElement('div');
+            d.className = 'grid-item'; d.innerHTML = i.c;
+            d.onclick = () => { if(i.t === 'user') show('scr-hub'); else alert("ERİŞİM REDDEDİLDİ"); };
+            g.appendChild(d);
+        });
+    }
+
+    /* --- MAĞAZA (GELİŞMİŞ WEB TARAYICI) --- */
+    function loadStore() {
+        const site = document.getElementById('siteSelect').value;
+        const query = document.getElementById('productInput').value;
+        const frame = document.getElementById('store-frame');
+        
+        let url = "";
+        // Bing Search Embed kullanıyoruz çünkü çoğu site iframe'i engeller.
+        // Bu yöntem "site:trendyol.com ayakkabı" araması yaparak sonuçları uygulama içinde gösterir.
+        if(site === 'trendyol') url = `https://www.bing.com/search?q=site:trendyol.com+${query}`;
+        else if(site === 'hepsiburada') url = `https://www.bing.com/search?q=site:hepsiburada.com+${query}`;
+        else if(site === 'amazon') url = `https://www.bing.com/search?q=site:amazon.com.tr+${query}`;
+        else if(site === 'n11') url = `https://www.bing.com/search?q=site:n11.com+${query}`;
+        else if(site === 'ciceksepeti') url = `https://www.bing.com/search?q=site:ciceksepeti.com+${query}`;
+
+        frame.src = url;
+    }
+
+    /* --- ŞİFRE OLUŞTURUCU --- */
+    function generatePass() {
+        const len = document.getElementById('pass-len').value;
+        const useNum = document.getElementById('chk-num').checked;
+        const useSym = document.getElementById('chk-sym').checked;
+        const useUpper = document.getElementById('chk-upper').checked;
+        
+        let chars = "abcdefghijklmnopqrstuvwxyz";
+        if(useUpper) chars += "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        if(useNum) chars += "0123456789";
+        if(useSym) chars += "!@#$%^&*()_+~";
+        
+        let pass = "";
+        for(let i=0; i<len; i++) {
+            pass += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        document.getElementById('pass-output').innerText = pass;
+        document.getElementById('copy-msg').style.display = 'none';
+    }
+
+    function copyPass() {
+        const txt = document.getElementById('pass-output').innerText;
+        navigator.clipboard.writeText(txt);
+        document.getElementById('copy-msg').style.display = 'block';
+    }
+
+    /* --- OYUN (IFRAME) --- */
+    function openGame() {
+        document.getElementById('game-frame-src').src = "https://www.crazygames.com/embed/escape-from-prison-multiplayer";
+        show('scr-game');
+    }
+    function closeGame() {
+        document.getElementById('game-frame-src').src = "";
+        show('scr-hub');
+    }
+
+</script>
+</body>
+</html>

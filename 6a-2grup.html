@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gezep'in Labirenti - Şifre Sınırlı</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #FFB6C1;
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .strawberry { position: absolute; font-size: 30px; z-index: -1; opacity: 0.7; user-select: none; }
+
+        .screen {
+            display: none;
+            width: 1000px;
+            height: 750px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+            text-align: center;
+            padding: 20px;
+            position: relative;
+            border: 5px solid #ff99aa;
+        }
+        .active { display: block; }
+
+        /* Kamera */
+        #camera-area {
+            width: 300px; height: 200px; background: #222; margin: 15px auto;
+            border: 8px solid #333; border-radius: 20px; position: relative; overflow: hidden;
+        }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        .scan-line {
+            width: 100%; height: 5px; background: #ff0000; position: absolute; 
+            box-shadow: 0 0 15px #ff0000; animation: moveScan 2s infinite ease-in-out;
+        }
+        @keyframes moveScan { 0% {top:0%} 50% {top:100%} 100% {top:0%} }
+
+        /* Labirent Izgaraları */
+        #maze-grid {
+            display: grid; gap: 2px; background: #228B22; padding: 12px; margin: 5px auto; width: fit-content; border-radius: 10px;
+        }
+        .cell { background: white; display: flex; align-items: center; justify-content: center; font-size: 25px; }
+        .wall { background: #2ecc71; border-radius: 4px; border: 1px solid #27ae60; }
+        
+        /* Paneller */
+        .code-banner {
+            background: #fff; padding: 10px; border-radius: 15px; font-size: 24px;
+            border: 3px dashed #FFB6C1; margin-bottom: 5px; color: #d35400; font-weight: bold;
+        }
+
+        /* DEV KIZGIN ÇİLEK (CSS ART) */
+        .giant-strawberry-container {
+            position: relative; width: 300px; height: 320px; margin: 20px auto; animation: angryShake 0.15s infinite;
+        }
+        .strawberry-body {
+            width: 220px; height: 250px; background: #e74c3c; position: absolute; left: 40px; top: 20px;
+            border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%; box-shadow: inset -15px -15px 0 rgba(0,0,0,0.1);
+        }
+        .leaf { width: 0; height: 0; border-left: 35px solid transparent; border-right: 35px solid transparent; border-bottom: 50px solid #27ae60; position: absolute; top: -25px; left: 75px; transform: rotate(10deg); }
+        .angry-eye { width: 35px; height: 35px; background: white; border-radius: 50%; position: absolute; top: 70px; }
+        .eye-l { left: 45px; } .eye-r { right: 45px; }
+        .pupil { width: 18px; height: 18px; background: black; border-radius: 50%; margin: 9px auto; }
+        .eyebrow { width: 55px; height: 10px; background: black; position: absolute; top: 60px; }
+        .eyebrow-l { left: 35px; transform: rotate(25deg); } .eyebrow-r { right: 35px; transform: rotate(-25deg); }
+        .angry-mouth { width: 70px; height: 15px; background: black; position: absolute; bottom: 70px; left: 75px; border-radius: 10px; }
+        .limb { background: #333; position: absolute; border-radius: 5px; }
+        .arm-l { width: 50px; height: 8px; left: -10px; top: 130px; transform: rotate(-30deg); }
+        .arm-r { width: 50px; height: 8px; right: -10px; top: 130px; transform: rotate(30deg); }
+        .leg-l { width: 8px; height: 40px; left: 90px; bottom: -20px; } .leg-r { width: 8px; height: 40px; right: 90px; bottom: -20px; }
+
+        @keyframes angryShake { 0% { transform: translate(2px, 2px); } 50% { transform: translate(-2px, -3px); } 100% { transform: translate(2px, 2px); } }
+
+        .speech-bubble {
+            background: white; border: 4px solid black; border-radius: 50px;
+            padding: 15px; position: absolute; top: 20px; right: -50px;
+            font-size: 20px; font-weight: bold; width: 250px; z-index: 10;
+        }
+
+        input { font-size: 20px; padding: 10px; border-radius: 12px; border: 3px solid #FFB6C1; width: 300px; text-align: center; }
+        button { font-size: 18px; padding: 10px 25px; border-radius: 12px; background: #FFB6C1; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background: #ff99aa; }
+    </style>
+</head>
+<body>
+
+    <div id="screen-face" class="screen active">
+        <h1 style="color: #ff6b81;">🍓 ÇİLEKLİ GÜVENLİK SİSTEMİ</h1>
+        <div id="camera-area">
+            <div class="scan-line"></div>
+            <video id="webcam" autoplay playsinline></video>
+        </div>
+        <h2 id="face-status">Kamera Hazırlanıyor...</h2>
+    </div>
+
+    <div id="screen-pass" class="screen">
+        <h1 style="color: #ff6b81;">KİMLİK ONAYLANDI! ✅</h1>
+        <p>Labirente giriş anahtarı oluşturun (Büyük, küçük harf ve rakam şart!)</p>
+        <div style="margin-top: 30px;">
+            <input type="text" id="init-pass" placeholder="Örn: Elma123">
+            <br><br>
+            <button onclick="validateInitPass()">Sisteme Gir</button>
+            <p id="pass-warn" style="color: red;"></p>
+        </div>
+    </div>
+
+    <div id="screen-char" class="screen">
+        <h1>KAHRAMANINI SEÇ</h1>
+        <div style="display: flex; justify-content: center; gap: 30px; margin-top: 50px;">
+            <button onclick="setChar('👧')" style="font-size: 40px;">👧<br>Zeynep</button>
+            <button onclick="setChar('👩‍🦰')" style="font-size: 40px;">👩‍🦰<br>Elif</button>
+            <button onclick="setChar('👦')" style="font-size: 40px;">👦<br>Mert</button>
+            <button onclick="setChar('🧔')" style="font-size: 40px;">🧔<br>Can</button>
+        </div>
+    </div>
+
+    <div id="screen-game" class="screen">
+        <div class="code-banner">Oluşan Şifre: <span id="maze-code-text"></span></div>
+        <div id="maze-grid"></div>
+        <p id="maze-target-desc" style="font-weight:bold; color:#d35400;">Sondaki sandığa ulaş!</p>
+    </div>
+
+    <div id="screen-verify" class="screen">
+        <div class="code-banner">UNUTMA! ŞİFREN: <span id="final-code-hint" style="color: #e74c3c;"></span></div>
+        <h2 id="verify-title" style="color: #f1c40f; margin-top: 40px;">🎁 KİLİDİ AÇ!</h2>
+        <input type="text" id="user-final-input" placeholder="Şifreyi yaz...">
+        <br><br>
+        <button onclick="checkFinalCode()">ONAYLA</button>
+    </div>
+
+    <div id="screen-win" class="screen">
+        <h1 style="color: #2ecc71; font-size: 50px; margin-top: 100px;">BİRİNCİ SEVİYE TAMAM! 🎉</h1>
+        <p>Sırada daha büyük bir labirent var!</p>
+        <br>
+        <button onclick="startLevel2()" style="background: #2ecc71; color: white; padding: 20px 40px; font-size: 25px;">2. SEVİYE'YE GEÇ</button>
+    </div>
+
+    <div id="screen-fail" class="screen">
+        <div class="giant-strawberry-container">
+            <div class="speech-bubble">dadaaaaaaaat yanliş cevap</div>
+            <div class="limb arm-l"></div> <div class="limb arm-r"></div>
+            <div class="strawberry-body">
+                <div class="leaf"></div> <div class="eyebrow eyebrow-l"></div> <div class="eyebrow eyebrow-r"></div>
+                <div class="angry-eye eye-l"><div class="pupil"></div></div>
+                <div class="angry-eye eye-r"><div class="pupil"></div></div>
+                <div class="angry-mouth"></div>
+            </div>
+            <div class="limb leg-l"></div> <div class="limb leg-r)</div>
+        </div>
+        <button onclick="location.reload()" style="margin-top: 50px;">TEKRAR DENE (EN BAŞA)</button>
+    </div>
+
+    <div id="screen-final-win" class="screen">
+        <h1 style="color: #2ecc71; font-size: 60px; margin-top: 100px;">EVİNE ULAŞTIN! 🏠</h1>
+        <p style="font-size: 24px;">Tebrikler, tüm engelleri aştın ve oyunu bitirdin!</p>
+        <br>
+        <button onclick="location.reload()">OYUNU YENİDEN BAŞLAT</button>
+    </div>
+
+    <script>
+        let currentLevel = 1;
+        let selectedEmoji = '👤';
+        let mazeCode = "";
+        let playerPos = { x: 1, y: 1 };
+        const chars = "ABC123XYZ";
+
+        const mazeMap1 = [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,0,0,0,1,0,0,0,0,0,1,0,0,0,1],
+            [1,1,1,0,1,0,1,1,1,0,1,1,1,0,1],
+            [1,0,0,0,0,0,1,0,0,0,0,0,0,0,1],
+            [1,0,1,1,1,1,1,0,1,1,1,1,1,0,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,3,1]
+        ];
+
+        const mazeMap2 = [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1],
+            [1,0,1,1,1,0,1,0,1,1,1,1,1,1,1,0,1,0,1,0,1],
+            [1,0,1,0,0,0,1,0,1,0,0,0,0,0,1,0,0,0,1,0,1],
+            [1,0,1,0,1,1,1,0,1,0,1,1,1,0,1,1,1,1,1,0,1],
+            [1,0,0,0,1,0,0,0,1,0,1,0,0,0,1,0,0,0,0,0,1],
+            [1,1,1,0,1,0,1,1,1,0,1,0,1,1,1,0,1,1,1,1,1],
+            [1,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1],
+            [1,0,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,0,1],
+            [1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1],
+            [1,0,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,0,1],
+            [1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,4,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        ];
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function validateInitPass() {
+            const pass = document.getElementById('init-pass').value;
+            if (/[A-Z]/.test(pass) && /[a-z]/.test(pass) && /[0-9]/.test(pass) && pass.length >= 6) {
+                showScreen('screen-char');
+            } else {
+                document.getElementById('pass-warn').innerText = "Zayıf şifre! (Büyük/Küçük harf ve rakam içermeli)";
+            }
+        }
+
+        function setChar(emoji) {
+            selectedEmoji = emoji;
+            showScreen('screen-game');
+            drawMaze();
+        }
+
+        function startLevel2() {
+            currentLevel = 2;
+            playerPos = { x: 1, y: 1 };
+            mazeCode = "";
+            document.getElementById('maze-code-text').innerText = "";
+            document.getElementById('maze-target-desc').innerText = "Sondaki eve ulaş!";
+            showScreen('screen-game');
+            drawMaze();
+        }
+
+        function drawMaze() {
+            const grid = document.getElementById('maze-grid');
+            const map = (currentLevel === 1) ? mazeMap1 : mazeMap2;
+            grid.style.gridTemplateColumns = `repeat(${map[0].length}, 40px)`;
+            grid.innerHTML = '';
+            
+            for(let y=0; y<map.length; y++) {
+                for(let x=0; x<map[y].length; x++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.style.width = '40px'; cell.style.height = '40px';
+                    if(map[y][x] === 1) cell.classList.add('wall');
+                    if(map[y][x] === 3) cell.innerHTML = "🎁";
+                    if(map[y][x] === 4) cell.innerHTML = "🏠";
+                    if(y === playerPos.y && x === playerPos.x) cell.innerHTML = selectedEmoji;
+                    grid.appendChild(cell);
+                }
+            }
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if(!document.getElementById('screen-game').classList.contains('active')) return;
+            const map = (currentLevel === 1) ? mazeMap1 : mazeMap2;
+            let nx = playerPos.x, ny = playerPos.y;
+            if(e.key === "ArrowUp") ny--;
+            if(e.key === "ArrowDown") ny++;
+            if(e.key === "ArrowLeft") nx--;
+            if(e.key === "ArrowRight") nx++;
+
+            if(map[ny] && map[ny][nx] !== 1 && map[ny][nx] !== undefined) {
+                playerPos.x = nx; playerPos.y = ny;
+                
+                // ŞİFRE ÜRETİMİ (10 KARAKTER SINIRI BURADA)
+                if(Math.random() > 0.6 && mazeCode.length < 10) {
+                    mazeCode += chars[Math.floor(Math.random()*chars.length)];
+                    document.getElementById('maze-code-text').innerText = mazeCode;
+                }
+                
+                drawMaze();
+                if(map[ny][nx] === 3 || map[ny][nx] === 4) {
+                    document.getElementById('final-code-hint').innerText = mazeCode;
+                    document.getElementById('verify-title').innerText = (currentLevel === 1) ? "🎁 KİLİDİ AÇ!" : "🏠 EVE GİRİŞ!";
+                    setTimeout(() => showScreen('screen-verify'), 500);
+                }
+            }
+        });
+
+        function checkFinalCode() {
+            const input = document.getElementById('user-final-input').value;
+            if(input === mazeCode && mazeCode !== "") {
+                document.getElementById('user-final-input').value = "";
+                if(currentLevel === 1) showScreen('screen-win');
+                else showScreen('screen-final-win');
+            } else {
+                showScreen('screen-fail');
+            }
+        }
+
+        window.onload = async () => {
+            const video = document.getElementById('webcam');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                document.getElementById('face-status').innerText = "Yüz Taranıyor...";
+                setTimeout(() => showScreen('screen-pass'), 3500);
+            } catch { document.getElementById('face-status').innerText = "Kamera Gerekli!"; }
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>MKMA Drift - Password Generator</title>
+    <style>
+        body { margin: 0; background: #050505; color: white; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; user-select: none; }
+        
+        #game-container { position: relative; width: 600px; height: 800px; background: #222; border: 4px solid #444; overflow: hidden; box-shadow: 0 0 50px rgba(0,242,255,0.2); }
+        
+        .screen { position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:20; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align: center; }
+        .hidden { display: none !important; }
+
+        /* KAMERA */
+        #cam-box { width: 320px; height: 240px; border: 2px solid #00f3ff; margin-bottom: 20px; position: relative; overflow: hidden; background:#000; box-shadow: 0 0 15px #00f3ff; }
+        video { width: 100%; height: 100%; transform: scaleX(-1); object-fit: cover; }
+        .scan-bar { position: absolute; width: 100%; height: 4px; background: #00f3ff; box-shadow: 0 0 10px #00f3ff; animation: scan 1.5s infinite ease-in-out; }
+        @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
+
+        /* UI */
+        h1 { color: #ff0055; font-size: 48px; text-shadow: 3px 3px 0px #fff; margin: 10px; font-style: italic; }
+        .btn { background: transparent; border: 2px solid #00f3ff; color: #00f3ff; padding: 15px 50px; font-size: 20px; cursor: pointer; margin: 10px; transition: 0.3s; font-weight: bold; border-radius: 5px; }
+        .btn:hover { background: #00f3ff; color: black; }
+        .password-display { font-family: 'Courier New', monospace; font-size: 24px; background: #333; padding: 10px 20px; border: 1px solid #555; border-radius: 5px; margin-top: 15px; color: yellow; min-width: 200px; }
+
+        /* HUD - ÜST PANEL GÜNCELLENDİ */
+        #hud-top { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 70px; 
+            background: rgba(0,0,0,0.85); z-index: 10; 
+            display: flex; align-items: center; justify-content: space-between; 
+            padding: 0 20px; box-sizing: border-box; border-bottom: 2px solid #555; 
+        }
+        #pass-container { display: flex; flex-direction: column; align-items: flex-start; }
+        #pass-hud { font-family: 'Courier New', monospace; font-size: 24px; color: #00ff88; font-weight: bold; letter-spacing: 2px; }
+        
+        /* YENİ KOPYALA BUTONU */
+        #btn-copy-instant {
+            background: #00f3ff; color: #000; border: none; padding: 8px 16px;
+            font-weight: bold; font-size: 14px; cursor: pointer; border-radius: 4px;
+            transition: 0.2s; box-shadow: 0 0 10px rgba(0, 243, 255, 0.4);
+        }
+        #btn-copy-instant:hover { transform: scale(1.05); box-shadow: 0 0 15px rgba(0, 243, 255, 0.8); }
+        #btn-copy-instant:active { transform: scale(0.95); }
+
+        #speedometer { position: absolute; bottom: 20px; right: 20px; font-size: 32px; font-weight: 900; color: #fff; z-index: 10; text-shadow: 2px 2px 0 #000; font-style: italic; }
+        
+        /* MAĞAZA */
+        #shop-list { width: 80%; max-height: 400px; overflow-y: auto; display: grid; gap: 10px; }
+        .car-item { border: 1px solid #444; padding: 15px; display: flex; justify-content: space-between; align-items: center; background: #111; }
+        .car-item:hover { border-color: #ff0055; }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="hud-top">
+            <div id="pass-container">
+                <div style="font-size:12px; color:#aaa; margin-bottom:2px;">TOPLANAN ŞİFRE:</div>
+                <div id="pass-hud">_</div>
+            </div>
+            <button id="btn-copy-instant" onclick="copyInstant()">KOPYALA</button>
+        </div>
+
+        <div id="speedometer"><span id="speed-val">0</span> <span style="font-size:16px">KM/H</span></div>
+
+        <div id="screen-security" class="screen">
+            <h2 style="color:white">SİSTEM GİRİŞİ</h2>
+            <div id="cam-box">
+                <video id="video" autoplay muted></video>
+                <div class="scan-bar"></div>
+            </div>
+            <div id="security-status" style="color:#00f3ff; font-weight:bold;">Yüz Taranıyor...</div>
+        </div>
+
+        <div id="screen-menu" class="screen hidden">
+            <h1>MKMA DRIFT</h1>
+            <p style="color:#ccc; margin-bottom:30px;">ŞİFRE OLUŞTURUCU</p>
+            <p style="color:gold" id="current-car-display">Seçili: Mazda RX-7</p>
+            <button class="btn" onclick="startGame()">YARIŞA BAŞLA</button>
+            <button class="btn" style="border-color:#ff0055; color:#ff0055" onclick="openShop()">GARAJ</button>
+        </div>
+
+        <div id="screen-shop" class="screen hidden">
+            <h2>GARAJ</h2>
+            <div style="margin-bottom:10px; color:gold;">BAKİYE: <span id="shop-money">0</span></div>
+            <div id="shop-list"></div>
+            <button class="btn" onclick="closeShop()">GERİ</button>
+        </div>
+
+        <div id="screen-gameover" class="screen hidden">
+            <h1 style="color: red;">KAZA YAPTIN!</h1>
+            <p>Şifre toplama işlemi durdu.</p>
+            <button class="btn" onclick="startGame()">TEKRAR DENE</button>
+            <button class="btn" onclick="showMenu()">ANA MENÜ</button>
+        </div>
+
+        <div id="screen-win" class="screen hidden">
+            <h1 style="color: #00ff88;">GÖREV BAŞARILI!</h1>
+            <p>Bitiş çizgisine ulaştın.</p>
+            <div style="margin-top:20px;">NİHAİ ŞİFRE:</div>
+            <div id="final-password" class="password-display">...</div>
+            <button class="btn" onclick="copyPassword()">KOPYALA</button>
+            <button class="btn" onclick="showMenu()">MENÜ</button>
+        </div>
+
+        <canvas id="gameCanvas" width="600" height="800"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let state = { money: 0, carIdx: 0, owned: [0], isPlaying: false, password: "" };
+        
+        // Araç Ayarları (Dengeli Hız)
+        const cars = [
+            { name: "Mazda RX-7", price: 0, maxSpeed: 70, color: "#e74c3c" },      
+            { name: "VW Arteon", price: 300, maxSpeed: 80, color: "#bdc3c7" },     
+            { name: "Lancer Evo", price: 500, maxSpeed: 85, color: "#ecf0f1" },
+            { name: "Skyline R34", price: 700, maxSpeed: 90, color: "#3498db" },
+            { name: "Supra MK4", price: 800, maxSpeed: 95, color: "#f39c12" },
+            { name: "Bugatti", price: 1500, maxSpeed: 110, color: "#111" }          
+        ];
+
+        const passChars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%&*?";
+
+        let player = { x: 275, y: 650, w: 50, h: 90, speed: 0 };
+        let roadOffsetY = 0;
+        let distance = 0;
+        const finishDistance = 10000;
+        let traffic = [];
+        let tokens = []; 
+
+        let keys = {};
+        window.onkeydown = e => keys[e.key.toLowerCase()] = true;
+        window.onkeyup = e => keys[e.key.toLowerCase()] = false;
+
+        // KAMERA
+        window.onload = function() {
+            const video = document.getElementById('video');
+            const status = document.getElementById('security-status');
+            
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then(stream => {
+                        video.srcObject = stream;
+                        setTimeout(() => {
+                            status.innerText = "YÜZ DOĞRULANDI ✔";
+                            status.style.color = "#00ff88";
+                            setTimeout(() => {
+                                document.getElementById('screen-security').classList.add('hidden');
+                                document.getElementById('screen-menu').classList.remove('hidden');
+                                stream.getTracks().forEach(t => t.stop());
+                            }, 1000);
+                        }, 2500);
+                    })
+                    .catch(() => manualLogin(status));
+            } else { manualLogin(status); }
+        };
+
+        function manualLogin(statusElem) {
+            statusElem.innerText = "Kamera Yok. Manuel Giriş...";
+            setTimeout(() => {
+                document.getElementById('screen-security').classList.add('hidden');
+                document.getElementById('screen-menu').classList.remove('hidden');
+            }, 2000);
+        }
+
+        // --- YENİ ÖZELLİK: OYUN İÇİ KOPYALAMA ---
+        function copyInstant() {
+            if(!state.password) return; // Boşsa kopyalama
+            
+            navigator.clipboard.writeText(state.password).then(() => {
+                const btn = document.getElementById('btn-copy-instant');
+                const originalText = btn.innerText;
+                const originalColor = btn.style.background;
+                
+                // Görsel Geri Bildirim
+                btn.innerText = "KOPYALANDI!";
+                btn.style.background = "#00ff88"; // Yeşil yap
+                
+                // 1 saniye sonra eski haline getir
+                setTimeout(() => {
+                    btn.innerText = originalText;
+                    btn.style.background = ""; // Orijinal CSS rengine döner
+                }, 1000);
+                
+                // Tuşların takılmaması için odağı geri al (opsiyonel ama iyi bir önlem)
+                window.focus(); 
+            });
+        }
+
+        function startGame() {
+            document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+            state.isPlaying = true;
+            state.password = "";
+            document.getElementById('pass-hud').innerText = "_";
+            
+            player.x = 275;
+            player.speed = 0;
+            distance = 0;
+            roadOffsetY = 0;
+            traffic = [];
+            tokens = [];
+
+            gameLoop();
+        }
+
+        function gameLoop() {
+            if (!state.isPlaying) return;
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function update() {
+            const carData = cars[state.carIdx];
+            const maxSpd = carData.maxSpeed / 10; 
+
+            // Hızlanma (Yavaş ve Kontrollü)
+            if (keys['w']) { 
+                if (player.speed < maxSpd) player.speed += 0.02; 
+            } else { 
+                if (player.speed > 0) player.speed -= 0.05; 
+            }
+            if (keys['s']) { 
+                if (player.speed > 0) player.speed -= 0.2; 
+            }
+            if (player.speed < 0) player.speed = 0;
+
+            // Sağa Sola
+            if (player.speed > 0.1) {
+                if (keys['a'] && player.x > 60) player.x -= 4; 
+                if (keys['d'] && player.x < 490) player.x += 4;
+            }
+
+            roadOffsetY = (roadOffsetY + player.speed * 8) % 100;
+            distance += player.speed;
+
+            // Trafik ve Token
+            if (Math.random() < 0.015 && player.speed > 1) spawnTraffic(); 
+            if (Math.random() < 0.015 && player.speed > 1) spawnToken();
+
+            updateEntities();
+            checkCollisions();
+
+            if (distance >= finishDistance) winGame();
+
+            document.getElementById('speed-val').innerText = Math.floor(player.speed * 12);
+        }
+
+        function spawnTraffic() {
+            const lane = Math.floor(Math.random() * 3);
+            const laneX = [120, 275, 430];
+            
+            // Trafik araçları hızlı (Oyuncuyla fark azalsın diye)
+            let trafficSpeed = 4 + Math.random() * 3; 
+
+            traffic.push({
+                x: laneX[lane] + (Math.random()*20 - 10),
+                y: -150,
+                w: 50, h: 90,
+                speed: trafficSpeed, 
+                color: "hsl(" + Math.random() * 360 + ", 60%, 40%)"
+            });
+        }
+
+        function spawnToken() {
+            const char = passChars.charAt(Math.floor(Math.random() * passChars.length));
+            tokens.push({
+                x: 80 + Math.random() * 400,
+                y: -50,
+                w: 30, h: 30,
+                char: char
+            });
+        }
+
+        function updateEntities() {
+            for (let i = traffic.length - 1; i >= 0; i--) {
+                let t = traffic[i];
+                t.y += (player.speed - (t.speed/10)) * 6; 
+                if (t.y > 900) traffic.splice(i, 1);
+            }
+            for (let i = tokens.length - 1; i >= 0; i--) {
+                let t = tokens[i];
+                t.y += player.speed * 6;
+                if (t.y > 900) tokens.splice(i, 1);
+            }
+        }
+
+        function checkCollisions() {
+            traffic.forEach(t => {
+                // Affedici Çarpışma Kutusu
+                if (player.x < t.x + t.w - 15 &&
+                    player.x + player.w > t.x + 15 &&
+                    player.y < t.y + t.h - 15 &&
+                    player.y + player.h > t.y + 15) {
+                    crashGame();
+                }
+            });
+
+            for (let i = tokens.length - 1; i >= 0; i--) {
+                if (rectIntersect(player, tokens[i])) {
+                    state.password += tokens[i].char;
+                    document.getElementById('pass-hud').innerText = state.password;
+                    tokens.splice(i, 1);
+                }
+            }
+        }
+
+        function rectIntersect(r1, r2) {
+            return !(r2.x > r1.x + r1.w || r2.x + r2.w < r1.x || r2.y > r1.y + r1.h || r2.y + r2.h < r1.y);
+        }
+
+        function draw() {
+            ctx.fillStyle = "#222";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Çimler
+            ctx.fillStyle = "#154012";
+            ctx.fillRect(0, 0, 60, canvas.height);
+            ctx.fillRect(540, 0, 60, canvas.height);
+
+            // Yol
+            ctx.fillStyle = "rgba(255,255,255,0.7)";
+            for (let i = -100; i < canvas.height; i += 100) {
+                let y = i + roadOffsetY;
+                ctx.fillRect(200, y, 10, 50);
+                ctx.fillRect(390, y, 10, 50);
+            }
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(70, 0, 5, canvas.height);
+            ctx.fillRect(525, 0, 5, canvas.height);
+
+            // Bitiş
+            if (finishDistance - distance < 1000) {
+                let finishY = (1000 - (finishDistance - distance)) * 6 - 200;
+                drawFinishLine(finishY);
+            }
+
+            drawTraffic();
+            drawTokens();
+            drawCar(player.x, player.y, cars[state.carIdx].color, true);
+        }
+
+        function drawTraffic() {
+            traffic.forEach(t => drawCar(t.x, t.y, t.color, false));
+        }
+
+        function drawTokens() {
+            ctx.font = "bold 24px Courier New";
+            ctx.textAlign = "center";
+            tokens.forEach(t => {
+                ctx.fillStyle = "gold";
+                ctx.beginPath();
+                ctx.arc(t.x + 15, t.y + 15, 20, 0, Math.PI*2);
+                ctx.fill();
+                ctx.fillStyle = "black";
+                ctx.fillText(t.char, t.x + 15, t.y + 22);
+            });
+        }
+
+        function drawCar(x, y, color, isPlayer) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.fillStyle = "rgba(0,0,0,0.4)";
+            ctx.fillRect(8, 8, 44, 86);
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(0, 80); ctx.lineTo(0, 20); ctx.lineTo(10, 0); ctx.lineTo(40, 0); ctx.lineTo(50, 20); ctx.lineTo(50, 80);
+            ctx.fill();
+            ctx.fillStyle = "#111";
+            ctx.fillRect(5, 25, 40, 15); 
+            ctx.fillRect(10, 65, 30, 10); 
+            ctx.fillStyle = isPlayer ? "#fff" : "#ffcc00";
+            ctx.fillRect(5, 2, 10, 6);
+            ctx.fillRect(35, 2, 10, 6);
+            ctx.fillStyle = (isPlayer && keys['s']) ? "#ff0000" : "#770000";
+            if(!isPlayer) ctx.fillStyle = "#770000"; 
+            ctx.fillRect(5, 80, 12, 5);
+            ctx.fillRect(33, 80, 12, 5);
+            ctx.restore();
+        }
+
+        function drawFinishLine(y) {
+            let size = 20;
+            for(let r=0; r<3; r++) {
+                for(let c=0; c<24; c++) {
+                    ctx.fillStyle = (r+c)%2==0 ? "white" : "black";
+                    ctx.fillRect(60 + c*size, y + r*size, size, size);
+                }
+            }
+        }
+
+        function crashGame() {
+            state.isPlaying = false;
+            document.getElementById('screen-gameover').classList.remove('hidden');
+        }
+
+        function winGame() {
+            state.isPlaying = false;
+            document.getElementById('final-password').innerText = state.password || "(Boş)";
+            document.getElementById('screen-win').classList.remove('hidden');
+            state.money += 100;
+            document.getElementById('shop-money').innerText = state.money;
+        }
+
+        function copyPassword() {
+            navigator.clipboard.writeText(state.password).then(() => {
+                alert("Kopyalandı!");
+            });
+        }
+
+        function showMenu() {
+            document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+            document.getElementById('screen-menu').classList.remove('hidden');
+        }
+
+        function openShop() {
+            document.getElementById('screen-menu').classList.add('hidden');
+            document.getElementById('screen-shop').classList.remove('hidden');
+            renderShop();
+        }
+        function closeShop() {
+            document.getElementById('screen-shop').classList.add('hidden');
+            document.getElementById('screen-menu').classList.remove('hidden');
+        }
+        function renderShop() {
+            const list = document.getElementById('shop-list');
+            list.innerHTML = "";
+            document.getElementById('shop-money').innerText = state.money;
+            cars.forEach((car, i) => {
+                const owned = state.owned.includes(i);
+                const active = state.carIdx === i;
+                let btn = active ? "<span style='color:lime'>SEÇİLİ</span>" : 
+                          (owned ? `<button onclick="selectCar(${i})">SEÇ</button>` : 
+                          `<button onclick="buyCar(${i})">AL (${car.price})</button>`);
+                let div = document.createElement('div');
+                div.className = "car-item";
+                div.innerHTML = `<div><strong style="color:${car.color}">${car.name}</strong></div><div>${btn}</div>`;
+                list.appendChild(div);
+            });
+        }
+        function buyCar(i) {
+            if(state.money >= cars[i].price) { state.money -= cars[i].price; state.owned.push(i); renderShop(); }
+            else alert("Para yetersiz!");
+        }
+        function selectCar(i) {
+            state.carIdx = i;
+            document.getElementById('current-car-display').innerText = "Seçili: " + cars[i].name;
+            renderShop();
+        }
+    </script>
+</body>
+</html>

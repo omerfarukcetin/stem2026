@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kedi ile Şifre Üret</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&family=Fredoka+One&display=swap" rel="stylesheet">
+    
+    <style>
+        /* --- GENEL AYARLAR --- */
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #1a1a2e;
+            font-family: 'Orbitron', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+            user-select: none;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .hidden { display: none !important; }
+
+        /* --- 1. GÜVENLİK --- */
+        .security-wrapper {
+            text-align: center;
+            border: 3px solid #e94560;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 0 25px #e94560;
+            background: rgba(0, 0, 0, 0.95);
+            width: 450px;
+            z-index: 500;
+        }
+
+        .login-step { display: none; }
+        .login-step.active { display: block; }
+
+        .neon-title { color: #e94560; text-shadow: 0 0 10px #e94560; margin-bottom: 25px; }
+        .status { color: #aaa; margin-bottom: 20px; font-size: 0.9rem; }
+
+        /* Kamera Çerçevesi */
+        .scan-frame {
+            width: 250px; height: 250px;
+            border: 3px solid #0f3460;
+            margin: 0 auto 30px; position: relative;
+            border-radius: 50%;
+            box-shadow: 0 0 15px #0f3460 inset;
+            overflow: hidden; background: #000;
+            display: flex; justify-content: center; align-items: center;
+        }
+        
+        #webcam-feed { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: none; }
+        .scan-placeholder { font-size: 80px; opacity: 0.5; }
+        .scan-line { width: 100%; height: 4px; background: #e94560; box-shadow: 0 0 10px #e94560; position: absolute; top: 0; left: 0; display: none; z-index: 20; }
+        .scanning .scan-line { display: block; animation: scanAnim 1.5s infinite alternate; }
+        @keyframes scanAnim { 0% { top: 0; } 100% { top: 100%; } }
+
+        /* Giriş Elemanları */
+        .neon-input { background: transparent; border: 2px solid #e94560; color: #fff; padding: 10px; font-size: 1.2rem; text-align: center; width: 80%; margin-bottom: 15px; outline: none; border-radius: 10px; }
+        .neon-btn { background: #e94560; color: white; border: none; padding: 12px 30px; font-size: 1rem; cursor: pointer; border-radius: 30px; transition: 0.3s; width: 100%; margin-top: 10px; font-weight: bold; }
+        .neon-btn:hover { background: #ff2e63; transform: scale(1.05); }
+
+        /* --- OYUN ALANI --- */
+        .game-wrapper {
+            width: 100%; height: 100vh;
+            background-color: #ff9a9e;
+            background-image: linear-gradient(90deg, #fad0c4 0%, #ffd1ff 100%);
+            display: flex; flex-direction: column; align-items: center;
+            font-family: 'Fredoka One', cursive;
+            position: relative;
+        }
+
+        /* Üst Bilgi Paneli */
+        .header {
+            position: absolute; top: 80px; 
+            background: rgba(255, 255, 255, 0.9); padding: 5px 30px;
+            border-radius: 50px; border: 3px solid #ff0055;
+            text-align: center; color: #ff0055;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2); z-index: 100;
+            display: flex; gap: 30px; font-size: 20px;
+        }
+
+        /* ŞİFRE BARI */
+        .password-container {
+            position: absolute; top: 15px;
+            width: 80%; max-width: 600px;
+            background: #111;
+            border: 2px solid #00ffcc;
+            border-radius: 10px;
+            padding: 10px;
+            z-index: 101;
+            box-shadow: 0 0 15px #00ffcc;
+            text-align: center;
+        }
+        
+        .password-label { font-size: 12px; color: #00ffcc; letter-spacing: 2px; font-family: 'Orbitron', sans-serif; display: block; margin-bottom: 5px; }
+        
+        .generated-password {
+            font-family: 'Courier New', monospace;
+            font-size: 24px;
+            color: #fff;
+            letter-spacing: 3px;
+            min-height: 28px;
+            word-break: break-all;
+        }
+
+        /* Oyun Sahası */
+        .game-area {
+            width: 90%; height: 75%; margin-top: 140px; 
+            position: relative;
+            border: 4px dashed #fff; border-radius: 20px;
+            cursor: crosshair;
+            overflow: hidden;
+        }
+        
+        /* HEDEF KEDİ */
+        .target-cat {
+            width: 130px; height: auto; position: absolute; cursor: pointer;
+            user-select: none; -webkit-user-drag: none;
+            filter: drop-shadow(0 5px 15px rgba(0,0,0,0.5)); 
+            display: none; transition: transform 0.05s; z-index: 1000;
+            pointer-events: auto;
+        }
+        .target-cat:active { transform: scale(0.85); filter: brightness(1.2); }
+
+        /* Sonuç Ekranı */
+        .overlay-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 200;
+        }
+        .result-title { font-size: 50px; margin-bottom: 10px; text-shadow: 0 0 20px currentColor; }
+        .win { color: #00ff00; }
+        .lose { color: #ff0000; }
+        
+        /* Kopyalama Alanı */
+        .final-password-box {
+            background: #222; border: 1px solid #fff;
+            padding: 15px; margin: 20px; border-radius: 5px;
+            font-family: monospace; color: #00ffcc; font-size: 20px;
+            max-width: 80%; word-break: break-all;
+        }
+
+        .hidden-start { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <div id="security-panel" class="security-wrapper">
+        <div id="step-scan" class="login-step active">
+            <h1 class="neon-title">GÜVENLİK</h1>
+            <p id="cam-status" class="status">Kamera hazırlanıyor...</p>
+            <div class="scan-frame">
+                <div class="scan-placeholder" id="placeholder-img">📷</div>
+                <video id="webcam-feed" autoplay playsinline muted></video>
+                <div class="scan-line"></div>
+            </div>
+            <button onclick="startScanning()" class="neon-btn">YÜZ TARA</button>
+        </div>
+
+        <div id="step-pass" class="login-step">
+            <h1 class="neon-title">GİRİŞ</h1>
+            <p class="status">İpucu: Kedi ile ilgili</p>
+            <input type="password" id="passInput" placeholder="Şifre" class="neon-input">
+            <button onclick="checkPassword()" class="neon-btn">GİRİŞ YAP</button>
+        </div>
+    </div>
+
+    <div id="game-panel" class="game-wrapper hidden">
+        
+        <div class="password-container">
+            <span class="password-label">OLUŞTURULAN GÜVENLİ ŞİFRE:</span>
+            <div id="livePassword" class="generated-password"></div>
+        </div>
+
+        <div class="header">
+            <div>Hedef: <span style="color:#000">10</span></div>
+            <div>Skor: <span id="scoreDisplay" style="color:#000">0</span></div>
+            <div>Süre: <span id="timeDisplay" style="color:red">10</span></div>
+        </div>
+
+        <div id="startOverlay" class="overlay-screen">
+            <h1 style="color:white; font-size:40px; margin-bottom:20px; text-align:center;">
+                ŞİFRE AVCISI KEDİ<br>
+                10 Saniyede 10 Karakter Topla!
+            </h1>
+            <button class="neon-btn" style="width:200px; font-size:24px;" onclick="startGame()">BAŞLA ►</button>
+        </div>
+
+        <div class="game-area" id="gameArea">
+            <img src="https://cdn-icons-png.flaticon.com/512/3468/3468377.png" 
+                 alt="Hedef Kedi" 
+                 id="targetCat" 
+                 class="target-cat"> 
+        </div>
+
+        <div id="resultOverlay" class="overlay-screen hidden-start">
+            <h1 id="resultTitle" class="result-title"></h1>
+            <p style="color:#ccc; font-size:16px;">Oluşturduğun Şifre:</p>
+            
+            <div id="finalPasswordDisplay" class="final-password-box">...</div>
+            
+            <button id="copyBtn" class="neon-btn" style="width:250px; background:#00ffcc; color:black; margin-bottom:15px;" onclick="copyPassword()">ŞİFREYİ KOPYALA 📋</button>
+            <button class="neon-btn" style="width:200px;" onclick="location.reload()">TEKRAR OYNA</button>
+        </div>
+    </div>
+
+    <script>
+        // --- SEÇİCİLER ---
+        const securityPanel = document.getElementById('security-panel');
+        const stepScan = document.getElementById('step-scan');
+        const stepPass = document.getElementById('step-pass');
+        const scanFrame = document.querySelector('.scan-frame');
+        const passInput = document.getElementById('passInput');
+        
+        const videoElement = document.getElementById('webcam-feed');
+        const placeholderImg = document.getElementById('placeholder-img');
+        const camStatus = document.getElementById('cam-status');
+
+        const gamePanel = document.getElementById('game-panel');
+        const startOverlay = document.getElementById('startOverlay');
+        const resultOverlay = document.getElementById('resultOverlay');
+        const resultTitle = document.getElementById('resultTitle');
+        
+        const targetCat = document.getElementById('targetCat');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const gameArea = document.getElementById('gameArea');
+        
+        const livePassword = document.getElementById('livePassword');
+        const finalPasswordDisplay = document.getElementById('finalPasswordDisplay');
+        const copyBtn = document.getElementById('copyBtn');
+
+        const PASSWORD = "jumpingcat";
+        const TARGET_SCORE = 10;
+        
+        const GAME_DURATION = 10; 
+
+        // KARAKTER HAVUZU
+        const CHAR_POOL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?/~";
+
+        let score = 0;
+        let timeLeft = GAME_DURATION;
+        let gameTimer;
+        let moveTimer;
+        let gameActive = false;
+        let stream = null;
+        let canClick = true; 
+        let currentPassword = ""; 
+
+        // --- GÜVENLİK ---
+        window.addEventListener('load', async () => {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                videoElement.srcObject = stream;
+                placeholderImg.style.display = 'none'; 
+                videoElement.style.display = 'block';
+                camStatus.textContent = "Kamera Hazır.";
+            } catch (err) {
+                console.error("Kamera hatası:", err);
+                camStatus.textContent = "Kamera bulunamadı.";
+            }
+        });
+
+        function startScanning() {
+            scanFrame.classList.add('scanning');
+            camStatus.textContent = "Analiz ediliyor...";
+            setTimeout(() => {
+                scanFrame.classList.remove('scanning');
+                stepScan.classList.remove('active');
+                stepPass.classList.add('active');
+                if (stream) stream.getTracks().forEach(track => track.stop());
+            }, 2000);
+        }
+
+        function checkPassword() {
+            if (passInput.value === PASSWORD) {
+                securityPanel.classList.add('hidden');
+                gamePanel.classList.remove('hidden');
+            } else {
+                passInput.value = "";
+                securityPanel.style.transform = "translateX(10px)";
+                setTimeout(() => securityPanel.style.transform = "translateX(0)", 100);
+            }
+        }
+        passInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') checkPassword(); });
+
+        // --- OYUN ---
+
+        targetCat.onpointerdown = function(e) {
+            catchCat(e);
+        };
+
+        function startGame() {
+            startOverlay.classList.add('hidden-start');
+            resultOverlay.classList.add('hidden-start');
+            
+            score = 0;
+            timeLeft = GAME_DURATION;
+            gameActive = true;
+            currentPassword = ""; 
+            livePassword.textContent = ""; 
+            
+            scoreDisplay.textContent = score;
+            timeDisplay.textContent = timeLeft;
+            
+            targetCat.style.display = 'block'; 
+            moveCat();
+
+            gameTimer = setInterval(() => {
+                timeLeft--;
+                timeDisplay.textContent = timeLeft;
+                if (timeLeft <= 0) {
+                    finishGame();
+                }
+            }, 1000);
+
+            moveTimer = setInterval(moveCat, 750);
+        }
+
+        function moveCat() {
+            if (!gameActive) return;
+            const areaWidth = gameArea.clientWidth;
+            const areaHeight = gameArea.clientHeight;
+            const catSize = 130; 
+            const randomX = Math.floor(Math.random() * (areaWidth - catSize));
+            const randomY = Math.floor(Math.random() * (areaHeight - catSize));
+            targetCat.style.left = randomX + 'px';
+            targetCat.style.top = randomY + 'px';
+        }
+
+        function catchCat(e) {
+            if (!gameActive || !canClick) return;
+            
+            e.stopPropagation();
+            e.preventDefault();
+            canClick = false;
+
+            // --- ŞİFRE OLUŞTURMA ---
+            const randomChar = CHAR_POOL.charAt(Math.floor(Math.random() * CHAR_POOL.length));
+            currentPassword += randomChar;
+            livePassword.textContent = currentPassword;
+
+            score++;
+            scoreDisplay.textContent = score;
+
+            clearInterval(moveTimer);
+            moveCat();
+            moveTimer = setInterval(moveCat, 750); 
+
+            setTimeout(() => { canClick = true; }, 100);
+        }
+
+        function finishGame() {
+            gameActive = false;
+            clearInterval(gameTimer);
+            clearInterval(moveTimer);
+            targetCat.style.display = 'none';
+
+            resultOverlay.classList.remove('hidden-start');
+            resultOverlay.style.display = 'flex';
+
+            finalPasswordDisplay.textContent = currentPassword || "(Şifre Oluşmadı)";
+
+            if (score >= TARGET_SCORE) {
+                resultTitle.textContent = "BAŞARDIN! 🎉";
+                resultTitle.className = "result-title win";
+            } else {
+                resultTitle.textContent = "SÜRE BİTTİ ⏳";
+                resultTitle.className = "result-title lose";
+            }
+        }
+
+        // --- KOPYALAMA ---
+        function copyPassword() {
+            if (!currentPassword) return;
+            
+            navigator.clipboard.writeText(currentPassword).then(() => {
+                copyBtn.textContent = "KOPYALANDI! ✅";
+                copyBtn.style.background = "#00ff00";
+                setTimeout(() => {
+                    copyBtn.textContent = "ŞİFREYİ KOPYALA 📋";
+                    copyBtn.style.background = "#00ffcc";
+                }, 2000);
+            }).catch(err => {
+                console.error('Kopyalama hatası: ', err);
+                alert("Kopyalama başarısız oldu.");
+            });
+        }
+    </script>
+</body>
+</html>

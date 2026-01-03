@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMS ❤️😘 - PRO GAME SECURITY+</title>
+    <style>
+        /* GENEL TASARIM */
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #e0f7fa;
+            overflow: hidden;
+        }
+
+        /* BEYAZ ÇİÇEK YAPRAKLARI */
+        .petal {
+            position: absolute; background-color: #fff;
+            border-radius: 150% 0 150% 0; opacity: 0.6;
+            pointer-events: none; animation: fall linear infinite;
+        }
+        @keyframes fall {
+            0% { transform: translateY(-10vh) rotate(0deg); }
+            100% { transform: translateY(110vh) rotate(360deg); }
+        }
+
+        /* EKRANLAR */
+        .screen {
+            display: none; width: 100%; height: 100%;
+            position: absolute; top: 0; left: 0;
+            justify-content: center; align-items: center;
+            flex-direction: column; text-align: center;
+            z-index: 10;
+        }
+        .active { display: flex; animation: fadeIn 0.4s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .glass-box {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px; border-radius: 30px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.1);
+            max-width: 600px; width: 90%;
+        }
+
+        /* YÜZ TANIMA */
+        .face-circle {
+            width: 220px; height: 220px; border-radius: 50%;
+            border: 6px solid #0288d1; overflow: hidden;
+            margin: 15px auto; position: relative; background: #000;
+        }
+        #video-feed { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        .scanner {
+            position: absolute; width: 100%; height: 4px;
+            background: #0f0; box-shadow: 0 0 10px #0f0;
+            top: 0; animation: scan 2s infinite linear;
+        }
+        @keyframes scan { 0% { top: 0%; } 50% { top: 100%; } 100% { top: 0%; } }
+
+        /* INPUTLAR */
+        input[type="text"], input[type="password"] {
+            width: 85%;
+            padding: 25px;
+            font-size: 24px;
+            border-radius: 20px;
+            border: 4px solid #0288d1;
+            margin-bottom: 20px;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        button {
+            padding: 18px 35px; margin: 10px; border: none;
+            border-radius: 15px; cursor: pointer; font-size: 20px;
+            font-weight: bold; transition: 0.2s;
+        }
+        .blue-btn { background: #0288d1; color: white; }
+        .yellow-btn { background: #ffeb3b; color: #333; }
+        .red-btn { background: #f44336; color: white; }
+        .diff-btn { background: #eee; color: #333; border: 2px solid #ccc; }
+        .diff-btn.selected { background: #0288d1; color: white; border-color: #01579b; }
+
+        .home-icon {
+            position: fixed; top: 15px; right: 15px;
+            font-size: 35px; cursor: pointer; z-index: 100;
+            background: white; border-radius: 50%; padding: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+
+        /* OYUN */
+        #game-canvas { width: 100%; height: 100%; display: block; background: #87CEEB; }
+        .game-ui {
+            position: absolute; top: 20px; left: 20px;
+            color: white; font-size: 26px; font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
+        }
+
+        .char-select { font-size: 50px; cursor: pointer; padding: 10px; transition: 0.3s; display: inline-block; }
+        .char-select.selected { transform: scale(1.4); filter: drop-shadow(0 0 10px #0288d1); }
+    </style>
+</head>
+<body>
+
+    <div id="petals-container"></div>
+    <div class="home-icon" onclick="exitGameToMenu()">🏠</div>
+
+    <div id="face-screen" class="screen active">
+        <div class="glass-box">
+            <h1 style="color: #d81b60;">SMS ❤️😘</h1>
+            <div class="face-circle">
+                <video id="video-feed" autoplay playsinline></video>
+                <div class="scanner"></div>
+            </div>
+            <p id="face-status">Kamera Taraması Başlıyor...</p>
+            <button class="blue-btn" onclick="startScan()">Kilit Aç</button>
+        </div>
+    </div>
+
+    <div id="password-screen" class="screen">
+        <div class="glass-box">
+            <h1>Güvenlik Doğrulama</h1>
+            <p style="font-size: 14px; color: #666;">Şifre: Büyük, Küçük harf ve Rakam içermelidir.</p>
+            <input type="password" id="passInput" placeholder="Şifrenizi Girin">
+            <br>
+            <button class="blue-btn" onclick="checkPassword()">Sisteme Gir</button>
+        </div>
+    </div>
+
+    <div id="hack-screen" class="screen" style="background:#000;">
+        <h1 style="color:red; font-size:60px;">HEKLENDİNİZ!</h1>
+        <p style="color: white; font-size: 20px;">Basit bir şifre kullandığınız için sisteminiz ele geçirildi.</p>
+        <div style="font-size:100px;">🐰😼👾☠️</div>
+        <button class="red-btn" onclick="showScreen('password-screen')">GÜVENLİ DÖNÜŞ</button>
+    </div>
+
+    <div id="menu-screen" class="screen">
+        <div class="glass-box">
+            <h2 style="color:#0288d1">Erişim Onaylandı</h2>
+            <button class="blue-btn" style="width: 85%;" onclick="showScreen('setup-screen')">Oyuna Başla 🎮</button>
+            <button class="blue-btn" style="width: 85%;" onclick="window.open('https://youtube.com')">YouTube 🎬</button>
+            <button class="blue-btn" style="width: 85%;" onclick="showScreen('lesson-screen')">Ders Paneli 📘</button>
+            <button class="blue-btn" style="width: 85%;" onclick="showScreen('shop-screen')">Alışveriş 🛍️</button>
+        </div>
+    </div>
+
+    <div id="setup-screen" class="screen">
+        <div class="glass-box">
+            <h3>Karakterini Seç</h3>
+            <div id="chars">
+                <span class="char-select" onclick="setChar('🐰', this)">🐰</span>
+                <span class="char-select" onclick="setChar('😼', this)">😼</span>
+                <span class="char-select" onclick="setChar('🐬', this)">🐬</span>
+                <span class="char-select" onclick="setChar('🐶', this)">🐶</span>
+            </div>
+            <hr>
+            <h3>Zorluk Seç</h3>
+            <button class="diff-btn" id="d-easy" onclick="setDiff(6, 'd-easy')">Kolay</button>
+            <button class="diff-btn" id="d-mid" onclick="setDiff(10, 'd-mid')">Orta</button>
+            <button class="diff-btn" id="d-hard" onclick="setDiff(16, 'd-hard')">Zor</button>
+            <br><br>
+            <button id="play-btn" class="blue-btn" style="display:none; width:100%;" onclick="initGame()">OYUNA BAŞLA</button>
+        </div>
+    </div>
+
+    <div id="game-screen" class="screen">
+        <div class="game-ui">
+            Can: <span id="lives">3</span> | Puan: <span id="score">0</span>
+        </div>
+        <canvas id="game-canvas"></canvas>
+    </div>
+
+    <div id="game-over-screen" class="screen">
+        <div class="glass-box">
+            <h1 id="game-over-title" style="color:red">OYUN BİTTİ!</h1>
+            <p id="game-over-msg"></p>
+            <button class="blue-btn" onclick="initGame()">Tekrardan Başla</button>
+            <button class="red-btn" onclick="exitGameToMenu()">Menüye Dön</button>
+        </div>
+    </div>
+
+    <div id="shop-screen" class="screen">
+        <div class="glass-box" style="max-width: 800px;">
+            <h2 style="color: #0288d1; font-size: 30px;">Amazon Alışveriş</h2>
+            <input type="text" id="sI" placeholder="Ne almak istersin?">
+            <br>
+            <button class="blue-btn" style="width: 90%; font-size: 24px;" onclick="window.open('https://amazon.com.tr/s?k='+document.getElementById('sI').value)">🛒 Amazon'da Ara</button>
+            <button class="red-btn" onclick="showScreen('menu-screen')">Geri Dön</button>
+        </div>
+    </div>
+
+    <div id="lesson-screen" class="screen">
+        <div class="glass-box" style="max-width: 800px;">
+            <h2 style="color: #0288d1; font-size: 30px;">Ders Çalışma Paneli</h2>
+            <input type="text" id="lI" placeholder="Konu başlığı girin...">
+            <br>
+            <button class="blue-btn" style="width: 90%; font-size: 24px;" onclick="window.open('https://google.com/search?q='+document.getElementById('lI').value)">📘 Konuyu Bul</button>
+            <button class="red-btn" onclick="showScreen('menu-screen')">Geri Dön</button>
+        </div>
+    </div>
+
+    <script>
+        // YAPRAK ANİMASYONU
+        for(let i=0; i<30; i++){
+            let p=document.createElement('div'); p.className='petal';
+            p.style.left=Math.random()*100+'vw'; p.style.width=p.style.height=Math.random()*15+10+'px';
+            p.style.animationDuration=Math.random()*3+4+'s'; p.style.animationDelay=Math.random()*5+'s';
+            document.getElementById('petals-container').appendChild(p);
+        }
+
+        // KAMERA
+        const v = document.getElementById('video-feed');
+        navigator.mediaDevices.getUserMedia({video:true}).then(s=>v.srcObject=s).catch(e=>console.log("Kamera pasif."));
+
+        function startScan() {
+            document.getElementById('face-status').innerText = "Yüz Tanınıyor...";
+            setTimeout(()=>showScreen('password-screen'), 2000);
+        }
+
+        function showScreen(id) {
+            if (id !== 'game-screen') gameActive = false;
+            document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function exitGameToMenu() {
+            gameActive = false;
+            showScreen('menu-screen');
+        }
+
+        // --- GÜNCEL ŞİFRE KONTROLÜ ---
+        function checkPassword() {
+            let p = document.getElementById('passInput').value;
+            
+            // Güçlü şifre kriterleri: En az 1 Büyük, 1 Küçük harf ve 1 Rakam
+            const hasUpper = /[A-Z]/.test(p);
+            const hasLower = /[a-z]/.test(p);
+            const hasNumber = /[0-9]/.test(p);
+
+            if (hasUpper && hasLower && hasNumber) {
+                // Şifre güçlüyse devam et
+                showScreen('menu-screen');
+            } else {
+                // Şifre basitse HACK ekranına at
+                showScreen('hack-screen');
+            }
+        }
+
+        // OYUN AYARLARI
+        let selChar = ''; let gameSpeed = 7;
+        function setChar(e, el) {
+            selChar = e;
+            document.querySelectorAll('.char-select').forEach(s=>s.classList.remove('selected'));
+            el.classList.add('selected');
+            checkReady();
+        }
+        function setDiff(s, id) {
+            gameSpeed = s;
+            document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('selected'));
+            document.getElementById(id).classList.add('selected');
+            checkReady();
+        }
+        function checkReady() { if(selChar && gameSpeed) document.getElementById('play-btn').style.display='block'; }
+
+        // OYUN MOTORU
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        let score=0, lives=3, gameActive=false;
+        let player = { x:100, y:0, dy:0 };
+        let obs = [], items = [];
+
+        function initGame() {
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+            player.ground = canvas.height - 120; player.y = player.ground;
+            score=0; lives=3; obs=[]; items=[]; gameActive=true;
+            showScreen('game-screen');
+            requestAnimationFrame(loop);
+        }
+
+        function loop() {
+            if(!gameActive) return;
+            ctx.clearRect(0,0,canvas.width, canvas.height);
+
+            // Yer
+            ctx.fillStyle="#263238"; ctx.fillRect(0, player.ground+60, canvas.width, 100);
+
+            // Oyuncu
+            player.dy += 0.8; player.y += player.dy;
+            if(player.y > player.ground) { player.y = player.ground; player.dy = 0; }
+            ctx.font = "65px Arial";
+            ctx.fillText(selChar, player.x, player.y + 55);
+
+            // Nesne Üretimi
+            if(Math.random() < 0.015) {
+                let r = Math.random();
+                let lastObjX = obs.length > 0 ? obs[obs.length-1].x : 0;
+                if(canvas.width - lastObjX > 350) {
+                    if(r < 0.5) {
+                        obs.push({x: canvas.width, y: player.ground+15, t:'💣'});
+                    } else {
+                        obs.push({x: canvas.width, y: player.ground-180, t:'🗡️', s:0});
+                    }
+                }
+            }
+            if(Math.random() < 0.02) items.push({x:canvas.width, y:player.ground - Math.random()*250, t: Math.random()>0.5?'💰':'💎'});
+
+            // Engeller
+            obs.forEach((o,i)=>{
+                o.x -= gameSpeed;
+                if(o.t==='🗡️'){
+                    o.s += 0.1; ctx.save(); ctx.translate(o.x, o.y); ctx.rotate(Math.sin(o.s)); ctx.fillText("🗡️",0,0); ctx.restore();
+                } else ctx.fillText(o.t, o.x, o.y+45);
+
+                if(Math.abs(player.x - o.x) < 55 && Math.abs(player.y - o.y) < 55) {
+                    gameActive = false;
+                    document.getElementById('game-over-msg').innerText = "Engele çarptın ve elendin!";
+                    showScreen('game-over-screen');
+                }
+            });
+
+            // Puanlar
+            items.forEach((it,i)=>{
+                it.x -= gameSpeed;
+                ctx.fillText(it.t, it.x, it.y);
+                if(Math.abs(player.x - it.x) < 50 && Math.abs(player.y - it.y) < 50) {
+                    score += (it.t==='💰'?10:5); items.splice(i,1);
+                }
+            });
+
+            document.getElementById('score').innerText = score;
+            document.getElementById('lives').innerText = lives;
+            requestAnimationFrame(loop);
+        }
+
+        // KONTROLLER
+        window.addEventListener('keydown', (e) => { 
+            if((e.code==='Space' || e.code==='ArrowUp') && player.y === player.ground) player.dy = -19; 
+        });
+        canvas.addEventListener('mousedown', () => { if(player.y === player.ground) player.dy = -19; });
+        canvas.addEventListener('touchstart', (e) => { if(player.y === player.ground) player.dy = -19; });
+    </script>
+</body>
+</html>
