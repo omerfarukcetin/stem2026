@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dijital Güvenlik STEM Projesi</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #3b82f6;
+            --accent-color: #10b981;
+            --bg-dark: #0f172a;
+            --card-bg: #1e293b;
+            --text-light: #f8fafc;
+            --text-gray: #94a3b8;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Navigation */
+        nav {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 1.5rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            background: linear-gradient(to right, #60a5fa, #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .nav-link {
+            color: var(--text-gray);
+            text-decoration: none;
+            cursor: pointer;
+            transition: color 0.3s;
+            font-weight: 500;
+            padding: 0.5rem 0;
+        }
+
+        .nav-link.active {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+        }
+
+        /* Hero Section */
+        header {
+            text-align: center;
+            padding: 4rem 2rem;
+            background: radial-gradient(circle at top, #1e293b 0%, #0f172a 100%);
+        }
+
+        header h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        header p {
+            color: var(--text-gray);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Content Sections */
+        .page-content {
+            display: none;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        .page-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Class Rows */
+        .class-section {
+            margin-bottom: 4rem;
+        }
+
+        .class-title {
+            font-size: 2rem;
+            margin-bottom: 1.5rem;
+            color: var(--accent-color);
+            border-left: 5px solid var(--accent-color);
+            padding-left: 1rem;
+        }
+
+        /* Grid Layout */
+        .group-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 1.5rem;
+        }
+
+        /* Group Cards */
+        .group-card {
+            background: var(--card-bg);
+            border: 1px solid rgba(255,255,255,0.05);
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 130px;
+        }
+
+        .group-card:hover {
+            transform: translateY(-5px);
+            background: var(--primary-color);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            border-color: transparent;
+        }
+
+        .group-card .group-id {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .group-card .label {
+            font-size: 0.875rem;
+            color: var(--text-gray);
+            margin-top: 0.5rem;
+        }
+
+        .group-card:hover .label {
+            color: white;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-gray);
+            border-top: 1px solid rgba(255,255,255,0.1);
+            margin-top: 4rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav-links { gap: 1rem; font-size: 0.8rem; }
+            header h1 { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <div class="logo">STEM | Dijital Güvenlik</div>
+        <div class="nav-links">
+            <a class="nav-link active" onclick="showPage('marmara', this)">Marmara Evleri</a>
+            <a class="nav-link" onclick="showPage('bahcelievler', this)">Bahçelievler</a>
+            <a class="nav-link" onclick="showPage('bizimevler', this)">Bizimevler</a>
+        </div>
+    </nav>
+
+    <header id="page-header">
+        <h1 id="header-title">Marmara Evleri Yerleşkesi</h1>
+        <p id="header-desc">Dijital Güvenlik STEM projesi kapsamında öğrenci çalışma grupları listesi.</p>
+    </header>
+
+    <!-- MARMARA EVLERİ PAGE -->
+    <main id="marmara" class="page-content active">
+        <div class="class-section">
+            <h2 class="class-title">6A Sınıfı</h2>
+            <div class="group-grid" id="marmara-6a"></div>
+        </div>
+        <div class="class-section">
+            <h2 class="class-title">6B Sınıfı</h2>
+            <div class="group-grid" id="marmara-6b"></div>
+        </div>
+        <div class="class-section">
+            <h2 class="class-title">6C Sınıfı</h2>
+            <div class="group-grid" id="marmara-6c"></div>
+        </div>
+    </main>
+
+    <!-- BAHÇELİEVLER PAGE -->
+    <main id="bahcelievler" class="page-content">
+        <div class="class-section">
+            <h2 class="class-title">6A Sınıfı</h2>
+            <div class="group-grid" id="bah-6a"></div>
+        </div>
+        <div class="class-section">
+            <h2 class="class-title">6B Sınıfı</h2>
+            <div class="group-grid" id="bah-6b"></div>
+        </div>
+        <div class="class-section">
+            <h2 class="class-title">6C Sınıfı</h2>
+            <div class="group-grid" id="bah-6c"></div>
+        </div>
+    </main>
+
+    <!-- BİZİMEVLER PAGE -->
+    <main id="bizimevler" class="page-content">
+        <div class="class-section">
+            <h2 class="class-title">6A Sınıfı</h2>
+            <div class="group-grid" id="bizim-6a"></div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 Dijital Güvenlik STEM Projesi - Tüm Hakları Saklıdır.</p>
+    </footer>
+
+    <script>
+        /**
+         * Grupları dinamik oluşturur ve linkleri atar
+         * @param {string} containerId - Kutucukların ekleneceği div ID'si
+         * @param {string} className - Sınıf adı (örn: 6A)
+         * @param {number} count - Grup sayısı
+         * @param {string[]} customLinks - Opsiyonel: Gruplar için özel link listesi
+         */
+        function generateGroups(containerId, className, count, customLinks = []) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            
+            for (let i = 1; i <= count; i++) {
+                const card = document.createElement('a');
+                
+                // Eğer özel bir link verilmişse onu kullan, yoksa '#' kullan
+                // customLinks[0] -> 1. Grup, customLinks[1] -> 2. Grup şeklinde gider
+                card.href = customLinks[i-1] || "#"; 
+                
+                // Eğer link dış bir siteye gidiyorsa yeni sekmede açması için:
+                if (card.href !== "#") {
+                    card.target = "_blank";
+                }
+
+                card.className = 'group-card';
+                card.innerHTML = `
+                    <div class="group-id">${className} - ${i}. Grup</div>
+                    <div class="label">Projeyi İncele</div>
+                `;
+                
+                container.appendChild(card);
+            }
+        }
+
+        function showPage(pageId, element) {
+            const pages = document.querySelectorAll('.page-content');
+            pages.forEach(p => p.classList.remove('active'));
+            
+            const selectedPage = document.getElementById(pageId);
+            if(selectedPage) selectedPage.classList.add('active');
+            
+            const links = document.querySelectorAll('.nav-link');
+            links.forEach(l => l.classList.remove('active'));
+            element.classList.add('active');
+
+            const headerTitle = document.getElementById('header-title');
+            const titles = {
+                'marmara': 'Marmara Evleri Yerleşkesi',
+                'bahcelievler': 'Bahçelievler Yerleşkesi',
+                'bizimevler': 'Bizimevler Yerleşkesi'
+            };
+            headerTitle.innerText = titles[pageId] || "STEM Projesi";
+        }
+
+        // Sayfa yüklendiğinde tüm grupları oluştur
+        window.onload = () => {
+            
+            // ÖRNEK LİNK KULLANIMI:
+            // Aşağıdaki dizilere (array) gerçek linklerinizi tırnak içinde ekleyin.
+            const marmara6ALinks = [
+                "https://link1.com", // 1. Grup Linki
+                "https://link2.com", // 2. Grup Linki
+                "https://link3.com", // 3. Grup Linki
+                "https://link4.com", // 4. Grup Linki
+                "https://link5.com", // 5. Grup Linki
+                "https://link6.com"  // 6. Grup Linki
+            ];
+
+            // MARMARA EVLERİ
+            generateGroups('marmara-6a', '6A', 6, marmara6ALinks);
+            generateGroups('marmara-6b', '6B', 7);
+            generateGroups('marmara-6c', '6C', 6);
+
+            // BAHÇELİEVLER
+            generateGroups('bah-6a', '6A', 4);
+            generateGroups('bah-6b', '6B', 4);
+            generateGroups('bah-6c', '6C', 4);
+
+            // BİZİMEVLER
+            generateGroups('bizim-6a', '6A', 5);
+        };
+    </script>
+</body>
+</html>
