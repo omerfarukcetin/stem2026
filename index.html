@@ -361,10 +361,20 @@
             generateGroups('marmara-6b', '6B', 7, marmara6BLinks);
             generateGroups('marmara-6c', '6C', 6, marmara6CLinks);
 
-            // BAHÇELİEVLER
-            generateGroups('bah-6a', '6A', 4);
-            generateGroups('bah-6b', '6B', 4);
-            generateGroups('bah-6c', '6C', 4);
+            // BAHÇELİEVLER// BAHÇELİEVLER 6A
+            names6A.forEach((name, index) => {
+                generateGroups('bah-6a', name, 1, [bahcelievler6ALinks[index]]);
+            });
+            
+            // BAHÇELİEVLER 6B
+            names6B.forEach((name, index) => {
+                generateGroups('bah-6b', name, 1, [bahcelievler6BLinks[index]]);
+            });
+            
+            // BAHÇELİEVLER 6C
+            names6C.forEach((name, index) => {
+                generateGroups('bah-6c', name, 1, [bahcelievler6CLinks[index]]);
+            });
 
             // BİZİMEVLER
             generateGroups('bizim-6a', '6A', 5, bizimevler6ALinks);
