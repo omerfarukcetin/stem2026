@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, orientation=landscape">
+    <title>Gölge Parkuru: Şifre Avcısı</title>
+    <style>
+        :root { 
+            --bordo: #800000; --altin: #D4AF37; 
+            --orman: #0d1a0d; --sabah: #87CEEB; --aksam: #0d1a0d;
+            --neon-engel: #FF4500;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: 'Courier New', monospace; overflow: hidden; background: var(--orman); color: white; transition: 1s; }
+
+        /* Ekranlar */
+        .screen { display: none; width: 100vw; height: 100vh; position: absolute; flex-direction: column; justify-content: center; align-items: center; background: rgba(0,0,0,0.95); z-index: 500; text-align: center; }
+        .active { display: flex; }
+
+        /* Yüz Tanıma */
+        #cam-circle { width: 200px; height: 200px; border-radius: 50%; border: 4px solid var(--altin); overflow: hidden; background: #000; }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        #scan-bar-wrap { width: 250px; height: 15px; background: #222; border-radius: 10px; margin-top: 15px; border: 1px solid white; }
+        #scan-fill { width: 0%; height: 100%; background: #39FF14; border-radius: 10px; transition: 0.1s; }
+
+        /* Kartlar */
+        .card-row { display: flex; gap: 15px; margin-top: 20px; }
+        .card { border: 3px solid var(--bordo); background: white; padding: 8px; border-radius: 15px; cursor: pointer; width: 130px; color: black; font-family: sans-serif; }
+        .card img { width: 100%; height: 140px; object-fit: cover; border-radius: 8px; }
+
+        /* HUD (Üst Panel) - Şifre Alanı Genişletildi */
+        #hud { 
+            position: fixed; top: 0; width: 100%; height: 70px; 
+            background: rgba(0,0,0,0.8); display: none; 
+            justify-content: space-around; align-items: center; z-index: 1000; 
+            border-bottom: 2px solid var(--altin);
+        }
+        #pass-container { 
+            display: flex; align-items: center; gap: 10px; 
+            background: #222; padding: 5px 15px; border-radius: 5px; border: 1px solid #555;
+        }
+        #password-display { 
+            font-size: 1.5rem; color: #39FF14; font-weight: bold; letter-spacing: 2px; 
+            min-width: 150px; text-align: center;
+        }
+        .copy-btn {
+            background: var(--altin); color: black; border: none; padding: 5px 10px;
+            cursor: pointer; font-weight: bold; font-size: 0.8rem; border-radius: 3px;
+        }
+        .copy-btn:active { background: white; }
+
+        #prog-wrap { width: 20%; height: 10px; background: rgba(255,255,255,0.2); border-radius: 5px; }
+        #prog-fill { width: 0%; height: 100%; background: var(--altin); }
+
+        /* Oyun Sahnesi */
+        #game-view { 
+            width: 100vw; height: 100vh; display: none; position: relative; 
+            background: url('https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1500') repeat-x; 
+            background-size: cover; background-position: bottom;
+        }
+
+        #player { 
+            width: 70px; height: 90px; position: absolute; bottom: 80px; left: 180px; 
+            background-size: contain; background-repeat: no-repeat; background-position: center;
+            border: 2px solid var(--altin); border-radius: 8px; z-index: 100;
+            background-color: rgba(255,255,255,0.1); transition: bottom 0.1s;
+        }
+
+        #monster { 
+            width: 80px; height: 80px; position: absolute; bottom: 80px; left: -200px; 
+            background-image: url('https://cdn-icons-png.flaticon.com/512/477/477265.png');
+            background-size: contain; background-repeat: no-repeat; background-position: center;
+            z-index: 90; filter: drop-shadow(0 0 15px red) invert(10%);
+        }
+        
+        .obstacle { width: 55px; height: 55px; background: var(--neon-engel); border: 3px solid white; position: absolute; bottom: 80px; border-radius: 5px; box-shadow: 0 0 15px var(--neon-engel); }
+        
+        /* Şifre Karakterleri (Toplanabilir) */
+        .char-item { 
+            width: 40px; height: 40px; 
+            background: rgba(0,0,0,0.7); 
+            border: 2px solid var(--altin); border-radius: 50%; 
+            position: absolute; 
+            color: var(--altin); font-weight: bold; font-size: 20px;
+            display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 0 10px var(--altin);
+        }
+
+        #sage-box { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 60%; background: white; color: var(--bordo); border: 4px solid var(--altin); border-radius: 20px; padding: 15px; z-index: 2000; display: none; text-align: center; font-family: sans-serif; }
+        
+        #countdown {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 8rem; color: var(--altin); font-weight: bold;
+            text-shadow: 0 0 20px red; z-index: 3000; display: none; font-family: sans-serif;
+        }
+
+        .btn { padding: 12px 30px; background: var(--altin); color: var(--bordo); border: none; border-radius: 25px; cursor: pointer; font-weight: bold; }
+        #mode-btn { position: fixed; top: 80px; right: 10px; z-index: 2000; display: none; font-size: 12px; }
+        .fw { position: absolute; width: 5px; height: 5px; border-radius: 50%; pointer-events: none; animation: explode 0.8s forwards; }
+        @keyframes explode { to { transform: translate(var(--x), var(--y)); opacity: 0; } }
+    </style>
+</head>
+<body>
+
+    <button id="mode-btn" class="btn" onclick="toggleDay()">☀️/🌙</button>
+    <div id="countdown">3</div>
+
+    <div id="hud">
+        <div style="color:var(--altin); font-size: 0.9rem;">LVL: <span id="lvl">1</span></div>
+        
+        <div id="pass-container">
+            <span style="color:#aaa; font-size:0.8rem;">ŞİFRE:</span>
+            <span id="password-display">...</span>
+            <button class="copy-btn" onclick="copyPassword()">KOPYALA</button>
+        </div>
+
+        <div id="prog-wrap"><div id="prog-fill"></div></div>
+    </div>
+
+    <div id="sc-intro" class="screen active">
+        <h1 style="color:var(--altin); font-size: 3rem;">GÖLGE PARKURU</h1>
+        <p style="color:white; margin-bottom:20px;">Güvenli Şifre Toplayıcısı</p>
+        <button class="btn" onclick="startScan()">BAŞLA</button>
+    </div>
+
+    <div id="sc-scan" class="screen">
+        <h2>KİMLİK TARANIYOR...</h2>
+        <div id="cam-circle"><video id="webcam" autoplay playsinline></video></div>
+        <div id="scan-bar-wrap"><div id="scan-fill"></div></div>
+    </div>
+
+    <div id="sc-char" class="screen">
+        <h2>KARAKTERİNİ SEÇ</h2>
+        <div class="card-row">
+            <div class="card" onclick="initGame('https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200')"><img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200"><p>HIRSIZ</p></div>
+            <div class="card" onclick="initGame('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200')"><img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200"><p>YOLDAŞ</p></div>
+            <div class="card" onclick="initGame('https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200')"><img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200"><p>BİLGE</p></div>
+        </div>
+    </div>
+
+    <div id="game-view">
+        <div id="player"></div>
+        <div id="monster"></div>
+        <div id="sage-box">
+            <h3 style="margin:0">GÖREVİN:</h3>
+            <p id="sage-text">Havada süzülen harf ve sembolleri toplayarak güvenli bir şifre oluştur! <br>3 saniye avansın var. <b>D</b> ile koş!</p>
+            <button class="btn" onclick="startCountdownLogic()">BAŞLA</button>
+        </div>
+    </div>
+
+    <script>
+        let collectedPass = ""; 
+        let distVal = 0, level = 1, finish = 8000;
+        let running = false, jumping = false, py = 0, pv = 0;
+        let monsterActive = false;
+        let keys = {};
+
+        // Şifre Karakter Havuzu
+        const charPool = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+=-";
+
+        async function startScan() {
+            document.getElementById('sc-intro').classList.remove('active');
+            document.getElementById('sc-scan').classList.add('active');
+            try { await navigator.mediaDevices.getUserMedia({video: true}).then(s => document.getElementById('webcam').srcObject = s); } catch(e){}
+            let p = 0;
+            let it = setInterval(() => {
+                p += 2; document.getElementById('scan-fill').style.width = p+"%";
+                if(p>=100) { clearInterval(it); document.getElementById('sc-scan').classList.remove('active'); document.getElementById('sc-char').classList.add('active'); }
+            }, 40);
+        }
+
+        function initGame(img) {
+            document.getElementById('player').style.backgroundImage = `url('${img}')`;
+            document.getElementById('sc-char').classList.remove('active');
+            document.getElementById('game-view').style.display = 'block';
+            document.getElementById('hud').style.display = 'flex';
+            document.getElementById('mode-btn').style.display = 'block';
+            document.getElementById('sage-box').style.display = 'block';
+            spawn();
+        }
+
+        function getRandomChar() {
+            return charPool.charAt(Math.floor(Math.random() * charPool.length));
+        }
+
+        function spawn() {
+            document.querySelectorAll('.obstacle, .char-item').forEach(o => o.remove());
+            
+            // 25 Engel ve Karakter Oluştur
+            for(let i=1; i<=25; i++) {
+                // Engel
+                let ob = document.createElement('div'); ob.className='obstacle';
+                ob.style.left = (1200 + i * 700) + "px";
+                document.getElementById('game-view').appendChild(ob);
+
+                // Şifre Karakteri
+                let ch = document.createElement('div'); ch.className='char-item';
+                ch.innerText = getRandomChar(); // Rastgele karakter seç
+                ch.style.left = (1500 + i * 700) + "px";
+                ch.style.bottom = (200 + Math.random()*150) + "px"; // Farklı yükseklikler
+                document.getElementById('game-view').appendChild(ch);
+            }
+        }
+
+        function startCountdownLogic() {
+            document.getElementById('sage-box').style.display = 'none';
+            document.getElementById('countdown').style.display = 'block';
+            
+            let count = 3;
+            document.getElementById('countdown').innerText = count;
+            
+            running = true; 
+            monsterActive = false; 
+            loop();
+
+            let timer = setInterval(() => {
+                count--;
+                if(count > 0) document.getElementById('countdown').innerText = count;
+                else if(count === 0) {
+                    document.getElementById('countdown').innerText = "KOŞ!";
+                    monsterActive = true; 
+                } else {
+                    document.getElementById('countdown').style.display = 'none';
+                    clearInterval(timer);
+                }
+            }, 1000);
+        }
+
+        window.onkeydown = (e) => { 
+            keys[e.code] = true; 
+            if((e.code === 'Space' || e.code === 'KeyW' || e.code === 'ArrowUp') && !jumping) { jumping = true; pv = 23; }
+        };
+        window.onkeyup = (e) => { keys[e.code] = false; };
+
+        function loop() {
+            if(!running) return;
+            
+            let speed = (keys['KeyD'] || keys['ArrowRight']) ? 13 : (keys['KeyA'] || keys['ArrowLeft'] ? 4 : 7);
+            
+            if(jumping) { py += pv; pv -= 1.3; if(py <= 0) { py = 0; jumping = false; } }
+            document.getElementById('player').style.bottom = (80 + py) + "px";
+
+            distVal += speed;
+            document.getElementById('prog-fill').style.width = (distVal/finish*100) + "%";
+            document.getElementById('game-view').style.backgroundPositionX = -(distVal*0.5) + "px";
+
+            // Engel Kontrolü
+            document.querySelectorAll('.obstacle').forEach(o => {
+                let l = parseInt(o.style.left) - speed; o.style.left = l + "px";
+                if(l < 240 && l > 170 && py < 55) { gameOver("ENGELE TAKILDIN!"); }
+            });
+
+            // ŞİFRE KARAKTERİ TOPLAMA
+            document.querySelectorAll('.char-item').forEach(c => {
+                let l = parseInt(c.style.left) - speed; c.style.left = l + "px";
+                let cb = parseInt(c.style.bottom);
+                
+                // Çarpışma: Eğer oyuncu karaktere dokunursa
+                if(l < 240 && l > 170 && (py + 80) > cb && py < (cb + 30)) { 
+                    collectedPass += c.innerText; // Şifreye ekle
+                    document.getElementById('password-display').innerText = collectedPass; 
+                    c.remove(); 
+                }
+            });
+
+            // Canavar Mantığı
+            if(monsterActive) {
+                let mPos = (distVal * (0.02 * level)) - 300 + (distVal * 0.01); 
+                let finalPos = Math.min(mPos, 60); 
+                document.getElementById('monster').style.left = finalPos + "px";
+                if(finalPos > 40 && py < 40) gameOver("GÖLGE YAKALADI!");
+            } else {
+                document.getElementById('monster').style.left = "-250px";
+            }
+
+            if(distVal >= finish) win();
+            else requestAnimationFrame(loop);
+        }
+
+        // KOPYALAMA FONKSİYONU
+        function copyPassword() {
+            if(!collectedPass) return alert("Henüz şifre karakteri toplamadın!");
+            navigator.clipboard.writeText(collectedPass).then(() => {
+                alert("Şifre Kopyalandı: " + collectedPass);
+            });
+        }
+
+        function gameOver(msg) {
+            running = false;
+            alert(msg + "\nOluşturduğun Şifre: " + collectedPass);
+            location.reload();
+        }
+
+        function win() {
+            running = false; fx();
+            level++; distVal = 0; finish += 2000;
+            document.getElementById('lvl').innerText = level;
+            document.getElementById('sage-text').innerText = "Tebrikler! Şifren: " + collectedPass + "\nSonraki levelde şifreni uzatmaya devam et!";
+            document.getElementById('sage-box').style.display = 'block';
+            spawn();
+        }
+
+        function fx() {
+            for(let i=0; i<30; i++) {
+                let f = document.createElement('div'); f.className = 'fw';
+                f.style.left = Math.random()*100+"vw"; f.style.top = Math.random()*100+"vh";
+                f.style.backgroundColor = `hsl(${Math.random()*360}, 100%, 50%)`;
+                f.style.setProperty('--x', (Math.random()-0.5)*300+"px");
+                f.style.setProperty('--y', (Math.random()-0.5)*300+"px");
+                document.body.appendChild(f);
+                setTimeout(() => f.remove(), 1000);
+            }
+        }
+
+        function toggleDay() {
+            let b = document.body;
+            b.style.background = b.style.background.includes('sky') ? 'var(--aksam)' : 'var(--sabah)';
+        }
+    </script>
+</body>
+</html>

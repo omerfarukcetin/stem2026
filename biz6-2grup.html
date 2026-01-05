@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>WASD Kontrollü Obby</title>
+    <style>
+        :root { --pink: #ff69b4; --bg: #ffb6c1; --blue: #00a2ff; --hair: #8B4513; }
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: 'Arial Black', sans-serif; background: var(--bg); }
+
+        /* --- UI EKRANLARI --- */
+        .screen { display: none; position: fixed; width: 100%; height: 100%; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; background: var(--bg); text-align: center; }
+        .active { display: flex; }
+        .btn { background: white; color: var(--pink); border: none; padding: 15px 40px; font-size: 1.2em; border-radius: 50px; cursor: pointer; box-shadow: 0 6px 0 #db7093; margin: 10px; transition: 0.2s; }
+        .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #db7093; }
+
+        /* KARAKTER SEÇİM KARTLARI */
+        .char-card { width: 130px; height: 180px; background: rgba(255,255,255,0.4); border-radius: 20px; display: inline-block; margin: 10px; cursor: pointer; border: 4px solid transparent; transition: 0.3s; }
+        .char-card.selected { border-color: #00ff00; background: white; box-shadow: 0 0 20px rgba(0,255,0,0.5); }
+        .preview-box { width: 40px; height: 60px; margin: 20px auto; border: 2px solid #333; }
+
+        /* OYUN ALANI */
+        #game-container { display: none; width: 100%; height: 100%; background: #87ceeb; overflow: hidden; position: relative; }
+        #world { position: absolute; width: 100%; height: 100%; }
+        
+        /* ROBLOX KARAKTERİ */
+        #player { width: 36px; height: 56px; position: absolute; border: 2px solid #333; z-index: 100; }
+        #player::after { content: ''; position: absolute; top: -21px; left: 7px; width: 21px; height: 21px; border: 2px solid #333; border-radius: 4px; }
+        .boy { background: var(--blue) !important; } .boy::after { background: var(--hair) !important; }
+        .girl { background: var(--pink) !important; } .girl::after { background: #FFC0CB !important; }
+
+        .platform { position: absolute; height: 20px; border-radius: 6px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .pass-char { position: absolute; font-size: 24px; color: white; font-weight: bold; text-shadow: 2px 2px #000; animation: float 1.5s infinite alternate; width: 30px; text-align: center; }
+        @keyframes float { from { transform: translateY(0); } to { transform: translateY(-15px); } }
+
+        #hud { position: absolute; top: 15px; width: 100%; display: flex; justify-content: space-around; z-index: 2000; color: white; text-shadow: 2px 2px #000; align-items: center; }
+        #collected-box { background: rgba(0,0,0,0.5); padding: 10px 20px; border-radius: 12px; font-family: monospace; letter-spacing: 3px; font-size: 18px; border: 2px solid rgba(255,255,255,0.3); }
+    </style>
+</head>
+<body>
+
+    <div id="screen-start" class="screen active">
+        <h1 style="color:white; font-size: 3.5em;">PARKOUR 2025</h1>
+        <button class="btn" onclick="openCam()">OYNA</button>
+        <button class="btn" style="background:#f1c40f;" onclick="showScreen('screen-char')">GİYDİR 👕</button>
+        <button class="btn" style="background:#3498db; color:white;" onclick="alert('KONTROLLER:\nW: Zıplama\nA: Sol\nD: Sağ\n\nHarfleri toplayarak şifreyi tamamla!')">BİLGİ ℹ️</button>
+    </div>
+
+    <div id="screen-char" class="screen">
+        <h1>KARAKTER SEÇ</h1>
+        <div class="char-card selected" id="c-boy" onclick="setChar('boy')">
+            <div class="preview-box" style="background:var(--blue);"></div>
+            <h3>ERKEK</h3>
+        </div>
+        <div class="char-card" id="c-girl" onclick="setChar('girl')">
+            <div class="preview-box" style="background:var(--pink);"></div>
+            <h3>KIZ</h3>
+        </div>
+        <br><button class="btn" onclick="showScreen('screen-start')">TAMAM</button>
+    </div>
+
+    <div id="screen-cam" class="screen"><video id="video" width="300" height="220" autoplay style="border-radius:20px; transform: scaleX(-1);"></video></div>
+    <div id="screen-pass" class="screen"><h1>ŞİFRE BELİRLE</h1><input type="password" id="p-input" style="padding:15px; border-radius:15px; border:none; text-align:center;"><br><button class="btn" onclick="checkPass()">BAŞLA</button></div>
+
+    <div id="game-container">
+        <div id="hud">
+            <div>Para: <span id="m-val">0</span> 💰</div>
+            <div id="collected-box">ŞİFRE: <span id="current-pass"></span></div>
+            <div>Level: <span id="l-val">1</span></div>
+        </div>
+        <div id="world"><div id="player"></div></div>
+    </div>
+
+    <script>
+        // --- AYARLAR (TAMAMEN SABİT) ---
+        const MOVE_SPEED = 5.2; 
+        const JUMP_FORCE = -13.5;
+        const GRAVITY = 0.75;
+        const GROUND_Y = 550;
+
+        let money = 0; let level = 1; 
+        let posX = 50; let posY = 480; let velY = 0;
+        let isJumping = false; 
+        let charType = 'boy'; 
+        let platforms = []; let itemsOnLevel = [];
+        let collectedStr = ""; let targetStr = "";
+        let isLoopRunning = false; 
+        const keys = {};
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            if(id === 'game') document.getElementById('game-container').style.display = 'block';
+            else document.getElementById(id).classList.add('active');
+        }
+
+        function setChar(type) {
+            charType = type;
+            document.querySelectorAll('.char-card').forEach(card => card.classList.remove('selected'));
+            document.getElementById('c-' + type).classList.add('selected');
+        }
+
+        async function openCam() {
+            showScreen('screen-cam');
+            try {
+                const s = await navigator.mediaDevices.getUserMedia({video: true});
+                document.getElementById('video').srcObject = s;
+                setTimeout(() => showScreen('screen-pass'), 2000);
+            } catch(e) { showScreen('screen-pass'); }
+        }
+
+        function checkPass() {
+            if(document.getElementById('p-input').value.length >= 3) {
+                showScreen('game');
+                initLevel();
+                if(!isLoopRunning) {
+                    isLoopRunning = true;
+                    requestAnimationFrame(gameLoop);
+                }
+            }
+        }
+
+        function initLevel() {
+            const world = document.getElementById('world');
+            world.innerHTML = `<div id="player" class="${charType}"></div>`;
+            platforms = []; itemsOnLevel = []; collectedStr = "";
+            
+            let passLen = 2 + level; 
+            targetStr = Math.random().toString(36).substring(2, 2 + passLen).toUpperCase();
+            
+            updateHUD();
+            addPlatform(0, GROUND_Y, 200, '#2ecc71', ''); 
+
+            for(let i=0; i < targetStr.length; i++) {
+                let x = (i + 1) * 280; 
+                let y = GROUND_Y - (i * 30);
+                addPlatform(x, y, 140, `hsl(${i * 50}, 70%, 60%)`, targetStr[i]);
+            }
+            
+            addPlatform((targetStr.length + 1) * 280, GROUND_Y - 120, 180, 'gold', '🏁');
+            posX = 50; posY = GROUND_Y - 56; velY = 0;
+        }
+
+        function addPlatform(x, y, w, color, char) {
+            const world = document.getElementById('world');
+            let p = document.createElement('div');
+            p.className = 'platform';
+            p.style.cssText = `left:${x}px; top:${y}px; width:${w}px; background:${color};`;
+            world.appendChild(p);
+            
+            if(char && char !== '🏁') {
+                let s = document.createElement('div');
+                s.className = 'pass-char';
+                s.style.cssText = `left:${x + (w/2) - 15}px; top:${y - 45}px;`;
+                s.innerText = char;
+                world.appendChild(s);
+                itemsOnLevel.push({x, y, char, collected: false, element: s});
+            }
+            platforms.push({x, y, w, isFinish: char === '🏁'});
+        }
+
+        function updateHUD() {
+            let display = "";
+            for(let i=0; i < targetStr.length; i++) display += collectedStr[i] ? collectedStr[i] : "_";
+            document.getElementById('current-pass').innerText = display;
+            document.getElementById('m-val').innerText = money;
+            document.getElementById('l-val').innerText = level;
+        }
+
+        // Klavye dinleyici
+        window.onkeydown = e => keys[e.code] = true;
+        window.onkeyup = e => keys[e.code] = false;
+
+        function gameLoop() {
+            // --- WASD KONTROLLERİ ---
+            if(keys['KeyD']) posX += MOVE_SPEED; // D: Sağ
+            if(keys['KeyA']) posX -= MOVE_SPEED; // A: Sol
+
+            velY += GRAVITY;
+            posY += velY;
+            let onGround = false;
+
+            platforms.forEach(plat => {
+                if(posX + 32 > plat.x && posX + 4 < plat.x + plat.w) {
+                    if(posY + 56 >= plat.y && posY + 56 <= plat.y + 15 && velY >= 0) {
+                        posY = plat.y - 56; velY = 0; isJumping = false; onGround = true;
+                        
+                        itemsOnLevel.forEach(item => {
+                            if(!item.collected && item.x === plat.x) {
+                                item.collected = true;
+                                item.element.style.visibility = 'hidden';
+                                collectedStr += item.char;
+                                updateHUD();
+                            }
+                        });
+
+                        if(plat.isFinish) {
+                            if(collectedStr.length === targetStr.length) {
+                                money += 20; level++;
+                                alert("Bölüm Geçildi! Hız hala sabit.");
+                                initLevel();
+                            } else {
+                                alert("Eksik harfler var!"); posX -= 100;
+                            }
+                        }
+                    }
+                }
+            });
+
+            // W: Zıplama
+            if(keys['KeyW'] && !isJumping && onGround) { velY = JUMP_FORCE; isJumping = true; }
+            
+            if(posY > 800) { posX = 50; posY = GROUND_Y - 60; velY = 0; }
+
+            const pEl = document.getElementById('player');
+            if(pEl) { pEl.style.left = posX + "px"; pEl.style.top = posY + "px"; }
+            document.getElementById('world').style.transform = `translateX(${-posX + 250}px)`;
+            
+            requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>

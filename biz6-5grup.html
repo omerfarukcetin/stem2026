@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Siber Güvenlik Simülasyonu</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0d0d0d;
+            color: #00ff00; /* Hacker Yeşili */
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* --- BÖLÜM 1: KAMERA EKRANI --- */
+        #camera-screen {
+            position: absolute;
+            text-align: center;
+            z-index: 10;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #video-feed {
+            width: 640px;
+            height: 480px;
+            border: 2px solid #00ff00;
+            box-shadow: 0 0 20px #00ff00;
+            transform: scaleX(-1); /* Ayna etkisi */
+            filter: grayscale(100%) contrast(1.2); /* Güvenlik kamerası efekti */
+        }
+
+        .scan-line {
+            position: absolute;
+            top: 50%; /* Videonun ortasından başlasın */
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 640px;
+            height: 5px;
+            background-color: rgba(0, 255, 0, 0.6);
+            box-shadow: 0 0 10px #00ff00;
+            animation: scanAnim 2s infinite linear;
+        }
+
+        @keyframes scanAnim {
+            0% { top: calc(50% - 240px); opacity: 0; }
+            50% { opacity: 1; }
+            100% { top: calc(50% + 240px); opacity: 0; }
+        }
+
+        /* --- BÖLÜM 2: OYUN EKRANI --- */
+        #game-screen {
+            display: none; /* Başlangıçta gizli */
+            width: 800px;
+            padding: 40px;
+            border: 1px solid #333;
+            background: #111;
+            box-shadow: 0 0 50px rgba(0, 255, 0, 0.1);
+            text-align: center;
+            border-radius: 10px;
+        }
+
+        h1 { margin-bottom: 10px; text-transform: uppercase; letter-spacing: 5px; }
+        p { color: #aaa; margin-bottom: 30px; }
+
+        input[type="text"] {
+            width: 80%;
+            padding: 15px;
+            font-size: 24px;
+            background: #222;
+            border: 2px solid #444;
+            color: white;
+            text-align: center;
+            outline: none;
+            transition: 0.3s;
+            border-radius: 5px;
+        }
+
+        input[type="text"]:focus { border-color: #00ff00; }
+
+        /* Güç Göstergesi */
+        .strength-bar-container {
+            width: 80%;
+            height: 10px;
+            background: #333;
+            margin: 20px auto;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        #strength-bar {
+            width: 0%;
+            height: 100%;
+            background: red;
+            transition: width 0.5s, background 0.5s;
+        }
+
+        /* Görev Listesi */
+        .requirements {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+
+        .req {
+            padding: 5px 10px;
+            border: 1px solid #444;
+            border-radius: 5px;
+            color: #555;
+        }
+
+        .req.active {
+            border-color: #00ff00;
+            color: #00ff00;
+            background: rgba(0, 255, 0, 0.1);
+        }
+
+        #crack-time {
+            font-size: 20px;
+            margin-top: 20px;
+            font-weight: bold;
+            color: #e74c3c;
+        }
+
+        button#finish-btn {
+            margin-top: 30px;
+            padding: 15px 40px;
+            font-size: 18px;
+            background: #444;
+            color: #888;
+            border: none;
+            cursor: not-allowed;
+            border-radius: 5px;
+            transition: 0.3s;
+        }
+
+        button#finish-btn.enabled {
+            background: #00ff00;
+            color: black;
+            cursor: pointer;
+            box-shadow: 0 0 15px #00ff00;
+        }
+
+        /* Matrix Arka Plan Efekti */
+        .matrix-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.1;
+            pointer-events: none;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, #003300 3px);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="matrix-bg"></div>
+
+    <div id="camera-screen">
+        <h2 id="scan-text">BİYOMETRİK TARAMA BAŞLATILIYOR...</h2>
+        <div style="position: relative;">
+            <video id="video-feed" autoplay muted></video>
+            <div class="scan-line"></div>
+        </div>
+        <p style="margin-top: 20px;">Lütfen hareketsiz durun.</p>
+    </div>
+
+    <div id="game-screen">
+        <h1>SİBER KASA KİLİDİ</h1>
+        <p>Kasayı kilitlemek için kırılması imkansız bir şifre oluştur.</p>
+
+        <input type="text" id="password-input" placeholder="Şifreni buraya yaz..." autocomplete="off">
+        
+        <div class="strength-bar-container">
+            <div id="strength-bar"></div>
+        </div>
+
+        <div id="crack-time">Hacker Tahmin Süresi: 0 Saniye</div>
+
+        <div class="requirements">
+            <div id="req-len" class="req">En az 8 Karakter</div>
+            <div id="req-num" class="req">Rakam (0-9)</div>
+            <div id="req-sym" class="req">Sembol (!?#)</div>
+            <div id="req-cap" class="req">Büyük Harf</div>
+        </div>
+
+        <button id="finish-btn" onclick="oyunuBitir()">KİLİDİ AKTİFLEŞTİR</button>
+    </div>
+
+    <script>
+        // --- KAMERA BÖLÜMÜ ---
+        const video = document.getElementById('video-feed');
+        const cameraScreen = document.getElementById('camera-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const scanText = document.getElementById('scan-text');
+
+        // Kamerayı başlat
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+                
+                // 3 Saniye sonra tarama tamamlandı efekti
+                setTimeout(() => {
+                    scanText.innerText = "YÜZ TANIMLANDI. GİRİŞ ONAYLANDI.";
+                    scanText.style.color = "#00ff00";
+                    video.style.borderColor = "#00ff00";
+                }, 3000);
+
+                // 4.5 Saniye sonra diğer ekrana geç
+                setTimeout(() => {
+                    stream.getTracks().forEach(track => track.stop()); // Kamerayı kapat
+                    cameraScreen.style.display = 'none';
+                    gameScreen.style.display = 'block';
+                    document.getElementById('password-input').focus();
+                }, 4500);
+            })
+            .catch(err => {
+                alert("Kameraya erişilemedi! Oyun manuel modda açılıyor.");
+                cameraScreen.style.display = 'none';
+                gameScreen.style.display = 'block';
+            });
+
+
+        // --- OYUN BÖLÜMÜ ---
+        const passInput = document.getElementById('password-input');
+        const bar = document.getElementById('strength-bar');
+        const crackTimeText = document.getElementById('crack-time');
+        const finishBtn = document.getElementById('finish-btn');
+
+        // Gereksinim Kutuları
+        const reqLen = document.getElementById('req-len');
+        const reqNum = document.getElementById('req-num');
+        const reqSym = document.getElementById('req-sym');
+        const reqCap = document.getElementById('req-cap');
+
+        passInput.addEventListener('input', function() {
+            const val = passInput.value;
+            let score = 0;
+
+            // 1. KONTROLLER
+            const hasLen = val.length >= 8;
+            const hasNum = /\d/.test(val);
+            const hasSym = /[!@#$%^&*(),.?":{}|<>]/.test(val);
+            const hasCap = /[A-Z]/.test(val);
+            const hasLow = /[a-z]/.test(val); // Sadece puan için
+
+            // Görsel Kutuları Güncelle
+            updateReq(reqLen, hasLen);
+            updateReq(reqNum, hasNum);
+            updateReq(reqSym, hasSym);
+            updateReq(reqCap, hasCap);
+
+            // 2. PUANLAMA
+            if (hasLen) score += 20;
+            if (hasLen && val.length > 12) score += 10; // Ekstra uzunluk puanı
+            if (hasNum) score += 20;
+            if (hasSym) score += 20;
+            if (hasCap) score += 15;
+            if (hasLow) score += 15;
+
+            if (score > 100) score = 100;
+
+            // 3. BAR RENGİ VE GENİŞLİĞİ
+            bar.style.width = score + "%";
+            
+            if (score < 40) {
+                bar.style.backgroundColor = "red";
+                crackTimeText.innerText = "Hacker Tahmin Süresi: < 1 Saniye (ÇOK TEHLİKELİ)";
+                crackTimeText.style.color = "red";
+            } else if (score < 80) {
+                bar.style.backgroundColor = "orange";
+                crackTimeText.innerText = "Hacker Tahmin Süresi: 3 Gün";
+                crackTimeText.style.color = "orange";
+            } else {
+                bar.style.backgroundColor = "#00ff00";
+                crackTimeText.innerText = "Hacker Tahmin Süresi: 4 Milyon Yıl";
+                crackTimeText.style.color = "#00ff00";
+            }
+
+            // 4. BİTİRME BUTONU KONTROLÜ
+            if (hasLen && hasNum && hasSym && hasCap) {
+                finishBtn.classList.add("enabled");
+                finishBtn.disabled = false;
+            } else {
+                finishBtn.classList.remove("enabled");
+                finishBtn.disabled = true;
+            }
+        });
+
+        function updateReq(element, isValid) {
+            if (isValid) {
+                element.classList.add("active");
+                element.innerHTML = "✓ " + element.innerText.replace("✓ ", "");
+            } else {
+                element.classList.remove("active");
+                element.innerHTML = element.innerText.replace("✓ ", "");
+            }
+        }
+
+        function oyunuBitir() {
+            alert("TEBRİKLER! Kasa başarıyla kilitlendi. Güvenlik seviyesi: MAKSİMUM.");
+            location.reload(); // Sayfayı yenile
+        }
+
+    </script>
+</body>
+</html>
